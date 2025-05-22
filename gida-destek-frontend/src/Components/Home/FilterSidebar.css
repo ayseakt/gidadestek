@@ -1,0 +1,290 @@
+/* FilterSidebar.css */
+
+/* Ana bileşen stillemesi */
+.filter-sidebar {
+  margin-top: 20px; 
+  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #f0f0f0;
+}
+
+/* Filtre başlık alanı */
+.filter-header {
+  margin-top: 20px; 
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #fff;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.filter-header:hover {
+  background-color: #f9f9f9;
+}
+
+.filter-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4e9351;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.filter-header h2 .filter-icon {
+  margin-right: 8px;
+  font-size: 1.1rem;
+}
+
+.filter-header-icon {
+  color: #4e9351;
+  font-size: 0.85rem;
+  transition: transform 0.3s ease;
+}
+
+.filter-header-icon.open {
+  transform: rotate(180deg);
+}
+
+/* Filtre içerik alanı */
+.filter-content {
+  padding: 15px;
+  border-top: 1px solid #f0f0f0;
+  background-color: #fcfcfc;
+}
+
+/* Animasyon */
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Bölüm stillendirmesi */
+.filter-section {
+  margin-bottom: 20px;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.filter-section-title .section-icon {
+  margin-right: 6px;
+  color: #4e9351;
+  font-size: 0.9rem;
+}
+
+/* Grid düzeni */
+.sort-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 768px) {
+  .sort-options-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Seçenek öğeleri */
+.option-item {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.option-item:hover {
+  border-color: #4e9351;
+  background-color: #f7fbf7;
+}
+
+.option-item.selected {
+  border-color: #4e9351;
+  background-color: #f0f8f0;
+}
+
+.option-item input {
+  display: none;
+}
+
+.option-item span {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.option-item.selected span {
+  color: #4e9351;
+  font-weight: 500;
+}
+
+/* Kategori stillendirmesi */
+.categories-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-item {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.category-item:hover {
+  border-color: #4e9351;
+  background-color: #f7fbf7;
+}
+
+.category-item.selected {
+  border-color: #4e9351;
+  background-color: #f0f8f0;
+}
+
+.category-item input {
+  display: none;
+}
+
+.category-item span {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.category-item.selected span {
+  color: #4e9351;
+  font-weight: 500;
+}
+
+/* Seçili filtreler görüntüleme */
+.selected-filters {
+  padding: 10px 15px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  background-color: #fafafa;
+}
+
+.selected-filters-label {
+  font-size: 0.8rem;
+  color: #777;
+  margin-right: 8px;
+}
+
+.selected-filters-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.selected-option {
+  color: #4e9351;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.selected-category-tag {
+  background-color: #edf7ed;
+  color: #4e9351;
+  border: 1px solid #cae6ca;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.remove-category-btn {
+  margin-left: 5px;
+  color: #4e9351;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.remove-category-btn:hover {
+  color: #3a7f3d;
+}
+
+/* Tümünü Gör butonu */
+.view-all-container {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+}
+
+.view-all-btn {
+  color: #4e9351;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-all-btn:hover {
+  color: #3a7f3d;
+  text-decoration: underline;
+}
+
+/* Filtreleme sayısı göstergesi */
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background-color: #4e9351;
+  color: white;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+/* Gölgeli animasyon */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}

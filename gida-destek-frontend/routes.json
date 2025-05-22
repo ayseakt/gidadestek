@@ -1,0 +1,6 @@
+{
+  "/api/categories": "/categories",
+  "/api/seller-locations": "/seller-locations",
+  "/api/statistics/my-stats": "/statistics/my-stats",
+  "/api/packages/my-packages": "/packages/my-packages"
+}

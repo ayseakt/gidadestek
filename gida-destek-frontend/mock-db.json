@@ -1,0 +1,39 @@
+{
+  "categories": [
+    { "id": 1, "name": "Restoran" },
+    { "id": 2, "name": "Fırın & Pastane" },
+    { "id": 3, "name": "Market" },
+    { "id": 4, "name": "Kafe" },
+    { "id": 5, "name": "Manav" },
+    { "id": 6, "name": "Diğer" }
+  ],
+  "seller-locations": [
+    { "id": 1, "name": "Bahçelievler Şubesi", "address": "Bahçelievler Mah. Sofra Sk. No:5" }
+  ],
+  "statistics": [
+    {
+      "id": 1,
+      "my-stats": {
+        "toplamPaket": 15,
+        "kurtarilanYemek": 45,
+        "kazanilanTutar": 750.5,
+        "azaltilanCO2": 135
+      }
+    }
+  ],
+  "packages": [
+    {
+      "id": 1,
+      "baslik": "Akşam Yemeği Paketi",
+      "fiyat": 60.0,
+      "indirimli": 25.0,
+      "miktar": 3,
+      "kalanSure": "3 saat",
+      "sonTeslim": "2025-05-19T20:00",
+      "description": "Lezzetli akşam yemeği paketi",
+      "category_id": 1,
+      "location_id": 1,
+      "fotograf": null
+    }
+  ]
+}

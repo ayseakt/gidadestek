@@ -1,0 +1,663 @@
+/* MyOrders.css - Trendyol Style */
+
+/* Root container and reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', 'Helvetica', Arial, sans-serif;
+}
+
+body {
+  background-color: #f8f8f8;
+}
+
+.trendyol-orders-container {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f8f8f8;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header styles */
+.trendyol-header {
+  background-color: #fff;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid #e5e5e5;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.trendyol-logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.trendyol-back-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #333;
+  cursor: pointer;
+  margin-right: 15px;
+}
+
+.trendyol-logo {
+  height: 40px;
+}
+
+.trendyol-logo-img {
+  height: 100%;
+  object-fit: contain;
+}
+
+.trendyol-search-container {
+  flex: 1;
+  max-width: 500px;
+  margin: 0 20px;
+}
+
+.trendyol-search-box {
+  position: relative;
+  width: 100%;
+}
+
+.trendyol-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+}
+
+.trendyol-search-input {
+  width: 100%;
+  padding: 12px 15px 12px 35px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.trendyol-search-input:focus {
+  border-color: #f27a1a;
+}
+
+.trendyol-user-actions {
+  display: flex;
+  align-items: center;
+}
+
+.trendyol-button {
+  padding: 10px 15px;
+  margin-left: 15px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  background-color: transparent;
+  color: #333;
+}
+
+.trendyol-button.address {
+  background-color: #f8f8f8;
+  border: 1px solid #e0e0e0;
+}
+
+.dropdown-arrow {
+  margin-left: 5px;
+  font-size: 10px;
+}
+
+.trendyol-button.cart {
+  background-color: #f27a1a;
+  color: white;
+}
+
+/* Main content area */
+.trendyol-content {
+  display: flex;
+  flex: 1;
+  padding: 0;
+}
+
+/* Sidebar */
+.trendyol-sidebar {
+  width: 250px;
+  background-color: #fff;
+  padding: 30px 15px;
+  border-right: 1px solid #e5e5e5;
+  min-height: calc(100vh - 70px);
+}
+
+.trendyol-user-info {
+  margin-bottom: 30px;
+}
+
+.trendyol-user-info h2 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.user-name {
+  font-size: 16px;
+  color: #555;
+}
+
+.trendyol-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #f8f8f8;
+}
+
+.menu-item.active {
+  background-color: #fff1e6;
+  color: #f27a1a;
+  font-weight: 500;
+}
+
+.menu-icon {
+  margin-right: 12px;
+  font-size: 18px;
+}
+
+.trendyol-assistant {
+  display: flex;
+  background-color: #e9f7ff;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 40px;
+  cursor: pointer;
+}
+
+.assistant-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.assistant-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0064c8;
+  margin-bottom: 5px;
+}
+
+.assistant-content p {
+  font-size: 13px;
+  color: #555;
+}
+
+/* Orders content area */
+.trendyol-orders-content {
+  flex: 1;
+  padding: 30px;
+}
+
+.trendyol-page-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 25px;
+  color: #333;
+}
+
+/* Orders List */
+.trendyol-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.trendyol-order-card {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.trendyol-order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.trendyol-order-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto auto;
+  gap: 15px;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.trendyol-order-restaurant h3,
+.trendyol-order-date h3,
+.trendyol-order-price h3 {
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 5px;
+  font-weight: normal;
+}
+
+.trendyol-order-restaurant p,
+.trendyol-order-date p {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.trendyol-order-price .price {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f27a1a;
+}
+
+.trendyol-order-status {
+  display: flex;
+  align-items: center;
+}
+
+.status-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+.status-icon.delivered {
+  background-color: #28a745;
+}
+
+.status-icon.cancelled {
+  background-color: #dc3545;
+}
+
+.status-icon.in-progress {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.status-icon.ready {
+  background-color: #17a2b8;
+}
+
+.trendyol-detail-button {
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+}
+
+.trendyol-detail-button:hover {
+  background-color: #eee;
+}
+
+.trendyol-order-details {
+  padding-top: 15px;
+}
+
+.order-product-name {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cancelled-label,
+.delivered-label,
+.active-label {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.cancelled-label {
+  color: #dc3545;
+}
+
+.delivered-label {
+  color: #28a745;
+}
+
+.active-label {
+  color: #ffc107;
+}
+
+.product-description {
+  font-size: 14px;
+  color: #333;
+}
+
+.no-orders {
+  padding: 40px;
+  text-align: center;
+  color: #777;
+  font-size: 16px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Order detail modal */
+.order-detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.trendyol-order-detail-modal {
+  background-color: #fff;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.close-modal-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #777;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.trendyol-order-detail-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.trendyol-order-detail-store {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.trendyol-order-detail-store img {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.trendyol-order-detail-store h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.trendyol-order-detail-store p {
+  font-size: 14px;
+  color: #555;
+}
+
+.trendyol-order-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.detail-row svg {
+  color: #f27a1a;
+  font-size: 18px;
+  margin-top: 2px;
+}
+
+.detail-row strong {
+  font-size: 14px;
+  display: block;
+  margin-bottom: 4px;
+  color: #777;
+}
+
+.detail-row p {
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+}
+
+.trendyol-order-items {
+  margin-bottom: 25px;
+}
+
+.trendyol-order-items h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.trendyol-items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.trendyol-items-table th {
+  text-align: left;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 1px solid #eee;
+}
+
+.trendyol-items-table td {
+  padding: 12px 10px;
+  font-size: 14px;
+  color: #333;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.trendyol-order-summary {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #555;
+}
+
+.summary-row.discount {
+  color: #28a745;
+}
+
+.summary-row.total {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  border-top: 1px solid #eee;
+  padding-top: 12px;
+  margin-top: 5px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  padding: 20px;
+  border-top: 1px solid #eee;
+}
+
+.trendyol-cancel-order-button {
+  padding: 12px 20px;
+  background-color: #fff;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.trendyol-cancel-order-button:hover {
+  background-color: #fff1f1;
+}
+
+.trendyol-primary-button {
+  padding: 12px 25px;
+  background-color: #f27a1a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.trendyol-primary-button:hover {
+  background-color: #e06c0f;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .trendyol-sidebar {
+    width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .trendyol-content {
+    flex-direction: column;
+  }
+  
+  .trendyol-sidebar {
+    width: 100%;
+    min-height: auto;
+    border-right: none;
+    border-bottom: 1px solid #e5e5e5;
+    padding: 20px;
+  }
+  
+  .trendyol-order-top {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .trendyol-header {
+    flex-direction: column;
+    height: auto;
+    padding: 10px;
+  }
+  
+  .trendyol-logo-container {
+    width: 100%;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  
+  .trendyol-search-container {
+    width: 100%;
+    max-width: none;
+    margin: 10px 0;
+  }
+  
+  .trendyol-user-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .trendyol-button {
+    margin: 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .trendyol-order-top {
+    grid-template-columns: 1fr;
+  }
+  
+  .trendyol-orders-content {
+    padding: 15px;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .trendyol-cancel-order-button,
+  .trendyol-primary-button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,475 @@
+/* AddressButton.css */
+
+.address-selection-container {
+  position: relative;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.address-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+  height: 45px;
+}
+
+.address-button:hover {
+  border-color: #ccc;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.address-icon {
+  font-size: 18px;
+}
+
+.address-text {
+  flex: 1;
+  text-align: left;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Popup Overlay */
+.address-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Saved Addresses Panel */
+.address-popup {
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  background-color: #fff;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.address-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.address-popup-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.address-popup-header button {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 5px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.address-popup-header button:hover {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.address-list {
+  max-height: 350px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.address-item {
+  padding: 15px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.address-content {
+  flex: 1;
+}
+
+.address-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.address-action-button {
+  background: none;
+  border: none;
+  color: #777;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.edit-button:hover {
+  color: #0066cc;
+  background-color: rgba(0, 102, 204, 0.1);
+}
+
+.delete-button:hover {
+  color: #ff3333;
+  background-color: rgba(255, 51, 51, 0.1);
+}
+
+.address-item:hover {
+  background-color: #f9f9f9;
+}
+
+.address-item.selected {
+  background-color: #f0f7ff;
+  border-left: 3px solid #ff5a00;
+}
+
+.address-name {
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.address-detail {
+  font-size: 13px;
+  color: #666;
+}
+
+.add-new-address-button {
+  width: 100%;
+  padding: 16px;
+  background-color: #f9f9f9;
+  border: none;
+  border-top: 1px solid #f0f0f0;
+  color: #ff5a00;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+}
+
+.add-new-address-button:hover {
+  background-color: #f0f0f0;
+}
+
+/* Map Popup Styles */
+.map-popup {
+  position: relative;
+  width: 90%;
+  max-width: 600px;
+  background-color: #fff;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.2s ease;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-popup-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.map-popup-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.map-popup-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.map-popup-header p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.map-popup-header button {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 5px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.map-popup-header button:hover {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.map-search-container {
+  padding: 15px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.map-search-box {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0 15px;
+  overflow: hidden;
+}
+
+.map-search-box input {
+  flex: 1;
+  border: none;
+  padding: 12px 0;
+  outline: none;
+  font-size: 14px;
+}
+
+.location-button {
+  background-color: #ff5a00;
+  border: none;
+  color: white;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.map-container {
+  flex: 1;
+  height: 300px;
+  position: relative;
+  min-height: 300px;
+}
+
+.map-markers {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+}
+
+.map-zoom-button {
+  background-color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  font-size: 22px;
+  color: #333;
+  cursor: pointer;
+}
+
+.address-form {
+  padding: 15px 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.form-row {
+  margin-bottom: 15px;
+}
+
+.form-row label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  color: #555;
+  font-weight: 500;
+}
+
+.form-row input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.form-row input:focus {
+  border-color: #ff5a00;
+  outline: none;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.form-actions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+}
+
+.cancel-button {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.save-button {
+  background-color: #ff5a00;
+  color: white;
+}
+
+/* Silme Onay Popup */
+.confirm-popup {
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  background-color: #fff;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.2s ease;
+}
+
+.confirm-popup-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.confirm-popup-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.confirm-popup-content {
+  padding: 20px;
+}
+
+.confirm-popup-content p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #555;
+}
+
+.confirm-address-detail {
+  color: #777;
+  font-size: 13px;
+}
+
+.confirm-popup-actions {
+  display: flex;
+  padding: 15px 20px;
+  border-top: 1px solid #f0f0f0;
+  gap: 15px;
+}
+
+.confirm-popup-actions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+}
+
+.delete-confirm-button {
+  background-color: #ff3333;
+  color: white;
+}
+
+/* Scroll bar styling */
+.address-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.address-list::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.address-list::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 10px;
+}
+
+.address-list::-webkit-scrollbar-thumb:hover {
+  background: #ccc;
+}
+
+/* For mobile devices */
+@media (max-width: 480px) {
+  .address-popup,
+  .map-popup,
+  .confirm-popup {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    border-radius: 0;
+    max-height: 100vh;
+  }
+  
+  .map-container {
+    height: 40vh;
+  }
+}

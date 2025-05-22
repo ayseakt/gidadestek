@@ -1,19 +1,60 @@
+// authMiddleware.js
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+const JWT_SECRET = process.env.JWT_SECRET || 'sofrapay-secret-key';
+
 module.exports = (req, res, next) => {
   try {
-    // Token kontrolü şimdilik basit bir yapı olsun
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ message: 'Yetkilendirme hatası: Token bulunamadı' });
+    // Bearer token'ı al
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Yetkilendirme hatası: Token formatı geçersiz' 
+      });
     }
     
-    // jwt.verify(token, process.env.JWT_SECRET);
-    // Şimdilik yetkilendirme kontrolünü aktif etmiyoruz
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Yetkilendirme hatası: Token bulunamadı' 
+      });
+    }
+    
+    // Token doğrulama
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Misafir kontrolü
+    if (decoded.isGuest) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu işlem için üye girişi yapmanız gerekmektedir.'
+      });
+    }
+    
+    // Kullanıcı bilgilerini request nesnesine ekle
+    req.user = {
+      id: decoded.id,
+      email: decoded.email
+    };
+    
     next();
   } catch (error) {
-    return res.status(401).json({ message: 'Yetkilendirme hatası' });
+    console.error('Token doğrulama hatası:', error);
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Oturum süresi doldu, lütfen tekrar giriş yapın' 
+      });
+    }
+    
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Yetkilendirme hatası: Geçersiz token' 
+    });
   }
 };
