@@ -99,3 +99,22 @@ export const disableTwoFactor = async () => {
     throw error.response?.data || { success: false, message: 'Sunucu hatası' };
   }
 };
+// Satıcı profil bilgilerini getir
+export const getSellerProfile = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/profile/seller`, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || { success: false, message: 'Sunucu hatası' };
+  }
+};
+
+// Satıcı profil bilgilerini güncelle
+export const updateSellerProfile = async (sellerData) => {
+  try {
+    const response = await axios.put(`${API_URL}/profile/seller/update`, sellerData, getAuthHeader());
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || { success: false, message: 'Sunucu hatası' };
+  }
+};

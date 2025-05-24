@@ -74,9 +74,10 @@ export const packageService = {
   
   updatePackage: (id, packageData) => api.put(`/packages/${id}`, packageData),
   
-  cancelPackage: (id) => api.post(`/packages/${id}/cancel`),
+  cancelPackage: (id, data = {}) => api.post(`/packages/${id}/cancel`, data),
   
-  getPackageDetails: (id) => api.get(`/packages/${id}`)
+  getPackageDetails: (id) => api.get(`/packages/${id}`),
+  getPackageHistory: () => api.get('/packages/history')
 };
 
 // İstatistik servisi

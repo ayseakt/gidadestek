@@ -1,8 +1,8 @@
-/* AddressButton.css */
+/* Modern AddressButton.css */
 
 .address-selection-container {
   position: relative;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   width: auto;
   flex-shrink: 0;
 }
@@ -10,35 +10,59 @@
 .address-button {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 15px;
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 14px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
   white-space: nowrap;
-  height: 45px;
+  height: 52px;
+  position: relative;
+  overflow: hidden;
+}
+
+.address-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.5s;
 }
 
 .address-button:hover {
-  border-color: #ccc;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  border-color: #ff6b35;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(255, 107, 53, 0.15), 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.address-button:hover::before {
+  left: 100%;
 }
 
 .address-icon {
-  font-size: 18px;
+  font-size: 20px;
+  background: linear-gradient(135deg, #ff6b35, #ff8f65);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .address-text {
   flex: 1;
   text-align: left;
-  color: #333;
+  color: #1e293b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 600;
 }
 
 /* Popup Overlay */
@@ -48,252 +72,267 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  animation: overlayFadeIn 0.3s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Saved Addresses Panel */
 .address-popup {
   position: relative;
   width: 90%;
-  max-width: 500px;
+  max-width: 520px;
   max-height: 90vh;
-  background-color: #fff;
-  border-radius: 15px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  animation: fadeIn 0.2s ease;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.1);
+  animation: popupSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes popupSlideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-30px) scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+  }
 }
 
 .address-popup-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
+  color: white;
 }
 
 .address-popup-header h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .address-popup-header button {
-  background: none;
+  background: rgba(255, 255, 255, 0.2);
   border: none;
-  color: #999;
+  color: white;
   cursor: pointer;
-  padding: 5px;
+  padding: 8px;
   font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .address-popup-header button:hover {
-  background-color: #f5f5f5;
-  color: #666;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
 }
 
 .address-list {
-  max-height: 350px;
+  max-height: 400px;
   overflow-y: auto;
   flex: 1;
+  padding: 8px 0;
 }
 
 .address-item {
-  padding: 15px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 18px 24px;
+  margin: 0 16px 8px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.address-content {
-  flex: 1;
-}
-
-.address-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.address-action-button {
-  background: none;
-  border: none;
-  color: #777;
-  cursor: pointer;
-  padding: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.edit-button:hover {
-  color: #0066cc;
-  background-color: rgba(0, 102, 204, 0.1);
-}
-
-.delete-button:hover {
-  color: #ff3333;
-  background-color: rgba(255, 51, 51, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: block;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .address-item:hover {
-  background-color: #f9f9f9;
+  background: linear-gradient(135deg, #fff5f2 0%, #ffffff 100%);
+  border-color: rgba(255, 107, 53, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 107, 53, 0.1);
 }
 
 .address-item.selected {
-  background-color: #f0f7ff;
-  border-left: 3px solid #ff5a00;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
+  color: white;
+  border-color: #ff6b35;
+  box-shadow: 0 8px 25px rgba(255, 107, 53, 0.3);
 }
 
 .address-name {
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.default-badge {
+  background: rgba(255, 107, 53, 0.1);
+  color: #ff6b35;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
   font-weight: 600;
-  margin-bottom: 5px;
-  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.address-item.selected .default-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
 }
 
 .address-detail {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.address-location {
   font-size: 13px;
-  color: #666;
+  opacity: 0.7;
+  font-weight: 500;
 }
 
 .add-new-address-button {
-  width: 100%;
+  width: calc(100% - 32px);
   padding: 16px;
-  background-color: #f9f9f9;
+  margin: 16px;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
   border: none;
-  border-top: 1px solid #f0f0f0;
-  color: #ff5a00;
-  font-weight: 600;
+  border-radius: 12px;
+  color: white;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  font-size: 14px;
+  transition: all 0.3s ease;
+  font-size: 15px;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
 }
 
 .add-new-address-button:hover {
-  background-color: #f0f0f0;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
 }
 
 /* Map Popup Styles */
 .map-popup {
   position: relative;
   width: 90%;
-  max-width: 600px;
-  background-color: #fff;
-  border-radius: 15px;
+  max-width: 650px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  animation: fadeIn 0.2s ease;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  animation: popupSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .map-popup-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.map-popup-header-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
+  color: white;
 }
 
 .map-popup-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
 }
 
 .map-popup-header p {
   margin: 0;
   font-size: 14px;
-  color: #666;
-}
-
-.map-popup-header button {
-  background: none;
-  border: none;
-  color: #999;
-  cursor: pointer;
-  padding: 5px;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s ease;
-}
-
-.map-popup-header button:hover {
-  background-color: #f5f5f5;
-  color: #666;
+  opacity: 0.9;
 }
 
 .map-search-container {
-  padding: 15px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .map-search-box {
   display: flex;
   align-items: center;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 0 15px;
-  overflow: hidden;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0 16px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.map-search-box:focus-within {
+  border-color: #ff6b35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .map-search-box input {
   flex: 1;
   border: none;
-  padding: 12px 0;
+  padding: 14px 0;
   outline: none;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .location-button {
-  background-color: #ff5a00;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
   border: none;
   color: white;
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin-left: 10px;
+  margin-left: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+.location-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
 }
 
 .map-container {
   flex: 1;
-  height: 300px;
+  height: 320px;
   position: relative;
-  min-height: 300px;
+  min-height: 320px;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .map-markers {
@@ -302,141 +341,122 @@
   right: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   z-index: 10;
 }
 
 .map-zoom-button {
-  background-color: white;
-  border: none;
-  width: 40px;
-  height: 40px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  font-size: 22px;
-  color: #333;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  font-size: 18px;
+  color: #1e293b;
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.map-zoom-button:hover {
+  background: white;
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
 .address-form {
-  padding: 15px 20px;
-  border-top: 1px solid #f0f0f0;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .form-row {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .form-row label {
   display: block;
-  margin-bottom: 5px;
-  font-size: 14px;
-  color: #555;
-  font-weight: 500;
+  margin-bottom: 8px;
+  font-size: 15px;
+  color: #1e293b;
+  font-weight: 600;
 }
 
 .form-row input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  font-size: 14px;
+  padding: 14px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  background: white;
+  box-sizing: border-box;
 }
 
 .form-row input:focus {
-  border-color: #ff5a00;
+  border-color: #ff6b35;
   outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .form-actions {
   display: flex;
   justify-content: space-between;
-  gap: 15px;
-  margin-top: 20px;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .form-actions button {
   flex: 1;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 600;
+  padding: 14px 20px;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   border: none;
+  transition: all 0.3s ease;
 }
 
 .cancel-button {
-  background-color: #f5f5f5;
-  color: #666;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 2px solid #e2e8f0;
+}
+
+.cancel-button:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
 }
 
 .save-button {
-  background-color: #ff5a00;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
   color: white;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
 }
 
-/* Silme Onay Popup */
-.confirm-popup {
-  position: relative;
-  width: 90%;
-  max-width: 400px;
-  background-color: #fff;
-  border-radius: 15px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  animation: fadeIn 0.2s ease;
+.save-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
 }
 
-.confirm-popup-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
+.save-button:disabled,
+.cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.confirm-popup-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-}
-
-.confirm-popup-content {
-  padding: 20px;
-}
-
-.confirm-popup-content p {
-  margin: 0 0 10px;
-  font-size: 14px;
-  color: #555;
-}
-
-.confirm-address-detail {
-  color: #777;
-  font-size: 13px;
-}
-
-.confirm-popup-actions {
-  display: flex;
-  padding: 15px 20px;
-  border-top: 1px solid #f0f0f0;
-  gap: 15px;
-}
-
-.confirm-popup-actions button {
-  flex: 1;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 14px;
-  border: none;
-}
-
-.delete-confirm-button {
-  background-color: #ff3333;
-  color: white;
+/* Loading state */
+.loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 /* Scroll bar styling */
@@ -445,23 +465,23 @@
 }
 
 .address-list::-webkit-scrollbar-track {
-  background: #f5f5f5;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
 }
 
 .address-list::-webkit-scrollbar-thumb {
-  background: #ddd;
+  background: linear-gradient(135deg, #ff6b35, #ff8f65);
   border-radius: 10px;
 }
 
 .address-list::-webkit-scrollbar-thumb:hover {
-  background: #ccc;
+  background: linear-gradient(135deg, #e55a2b, #ff6b35);
 }
 
 /* For mobile devices */
 @media (max-width: 480px) {
   .address-popup,
-  .map-popup,
-  .confirm-popup {
+  .map-popup {
     width: 100%;
     height: 100%;
     max-width: none;
@@ -470,6 +490,19 @@
   }
   
   .map-container {
-    height: 40vh;
+    height: 35vh;
+  }
+  
+  .address-button {
+    padding: 12px 16px;
+    height: 48px;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .form-actions button {
+    width: 100%;
   }
 }

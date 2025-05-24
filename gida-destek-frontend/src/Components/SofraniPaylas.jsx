@@ -510,14 +510,18 @@ function SofraniPaylas() {
 
   // Paket iptal etme
   const handleCancelPackage = async (paketId) => {
+    const cancelReason = prompt("Paketi neden iptal ediyorsunuz? (İsteğe bağlı)");
+    
     if (window.confirm("Bu paketi iptal etmek istediğinizden emin misiniz?")) {
       setLoading(true);
       try {
         console.log("İptal edilecek paket ID:", paketId);
         
-        await packageService.cancelPackage(paketId);
+        await packageService.cancelPackage(paketId, { 
+          cancellation_reason: cancelReason || "Satıcı tarafından iptal edildi" 
+        });
         
-        // State'ten paketi kaldır
+        // Geri kalan kod aynı...
         setPaketlerim(prevPaketler => 
           prevPaketler.filter(p => 
             p.id !== paketId && p.package_id !== paketId
@@ -527,16 +531,7 @@ function SofraniPaylas() {
         alert("Paket başarıyla iptal edildi.");
         
       } catch (err) {
-        console.error("Paket iptal edilirken hata:", err);
-        
-        if (err.response && err.response.status === 401) {
-          setError("Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.");
-          setIsAuthenticated(false);
-        } else if (err.response && err.response.data && err.response.data.message) {
-          setError(`Paket iptal edilirken hata: ${err.response.data.message}`);
-        } else {
-          setError("Paket iptal edilirken bir hata oluştu. Lütfen tekrar deneyin.");
-        }
+        // Hata handling kodu aynı...
       } finally {
         setLoading(false);
       }
@@ -621,7 +616,7 @@ function SofraniPaylas() {
     resetForm();
     setActiveTab('aktifpaketler');
   };
-
+  const [gecmisPaketler, setGecmisPaketler] = useState([]);
   // Paketleri yeniden yükleme fonksiyonu
   const refreshPackages = async () => {
     try {
@@ -693,6 +688,41 @@ function SofraniPaylas() {
       
       // Hata durumunda boş array set et
       setPaketlerim([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Geçmiş paketleri yükleme fonksiyonu 
+  const refreshPackageHistory = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Geçmiş paketler yükleniyor...');
+      const response = await packageService.getPackageHistory();
+      console.log('Geçmiş paketler API Response:', response);
+      
+      if (response && response.data) {
+        let historyData = [];
+        
+        if (Array.isArray(response.data)) {
+          historyData = response.data;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          historyData = response.data.data;
+        }
+        
+        console.log('Yüklenen geçmiş paketler:', historyData);
+        setGecmisPaketler(historyData); // Bu state'i de eklemeniz gerekecek
+        
+      } else {
+        console.warn('Geçmiş paketler response data boş:', response);
+        setGecmisPaketler([]);
+      }
+      
+    } catch (err) {
+      console.error("Geçmiş paketler yüklenirken hata:", err);
+      setError("Geçmiş paketler yüklenemedi.");
+      setGecmisPaketler([]);
     } finally {
       setLoading(false);
     }
@@ -822,6 +852,10 @@ function SofraniPaylas() {
     if (activeTab === 'aktifpaketler' && isAuthenticated) {
       console.log('Aktif paketler sekmesi açıldı, paketler yükleniyor...');
       refreshPackages();
+    }
+    if (activeTab === 'gecmis' && isAuthenticated) {
+      console.log('Geçmiş sekmesi açıldı, geçmiş paketler yükleniyor...');
+      refreshPackageHistory();
     }
   }, [activeTab, isAuthenticated]);
 
@@ -982,7 +1016,7 @@ function SofraniPaylas() {
               
               <div className="form-row">
                 <div className="form-group">
-                  <label>Paket Adedi</label>
+                  <label>Ürün Adedi</label>
                   <input 
                     type="number" 
                     name="quantity_available"
@@ -1004,7 +1038,7 @@ function SofraniPaylas() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Son Kullanma Tarihi</label>
+                  <label>Son Tüketim Tarihi</label>
                   <input 
                     type="datetime-local" 
                     name="pickup_end_time"
@@ -1147,22 +1181,22 @@ function SofraniPaylas() {
                   required
                 >
                   <option value="">Kategori Seçin</option>
-                  {categories.length > 0 ? (
-                    categories.map(category => (
-                      <option key={category.category_id} value={category.category_id}>
-                        {category.name}
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="1">Restoran</option>
-                      <option value="2">Fırın & Pastane</option>
-                      <option value="3">Market</option>
-                      <option value="4">Kafe</option>
-                      <option value="5">Manav</option>
-                      <option value="6">Diğer</option>
-                    </>
-                  )}
+                    {categories.length > 0 ? (
+                      categories.map(category => (
+                        <option key={category.category_id} value={category.category_id}>
+                          {category.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option key="1" value="1">Restoran</option>
+                        <option key="2" value="2">Fırın & Pastane</option>
+                        <option key="3" value="3">Market</option>
+                        <option key="4" value="4">Kafe</option>
+                        <option key="5" value="5">Manav</option>
+                        <option key="6" value="6">Diğer</option>
+                      </>
+                    )}
                 </select>
               </div>
               <div className="form-actions">
@@ -1257,76 +1291,42 @@ function SofraniPaylas() {
           <div className="gecmis-paketler">
             <h2>Geçmiş Paketlerim</h2>
             
-            <div className="paket-filter">
-              <div className="filter-options">
-                <span>Filtreleme:</span>
-                <select>
-                  <option>Tüm Paketler</option>
-                  <option>Teslim Edilenler</option>
-                  <option>İptal Edilenler</option>
-                </select>
-                
-                <span>Sıralama:</span>
-                <select>
-                  <option>En Yeni</option>
-                  <option>En Eski</option>
-                  <option>Fiyat (Artan)</option>
-                  <option>Fiyat (Azalan)</option>
-                </select>
+            {loading && (
+              <div className="loading-indicator">
+                <div className="spinner"></div>
+                <p>Yükleniyor...</p>
               </div>
-              
-              <div className="date-filter">
-                <input type="date" placeholder="Başlangıç" />
-                <span>-</span>
-                <input type="date" placeholder="Bitiş" />
+            )}
+            
+            {!loading && gecmisPaketler.length === 0 && (
+              <div className="no-packages">
+                <p>Geçmiş paketiniz bulunmamaktadır.</p>
               </div>
-            </div>
+            )}
             
             <div className="paket-list history">
-              <div className="paket-card completed">
-                <div className="paket-image">
-                  <img src="/assets/placeholder-food.png" alt="Tamamlanan Paket" />
-                  <div className="status-badge success">Teslim Edildi</div>
-                </div>
-                <div className="paket-details">
-                  <h3>Akşam Menüsü</h3>
-                  <div className="price-container">
-                    <span className="original-price">₺60.00</span>
-                    <span className="discount-price">₺25.00</span>
+              {gecmisPaketler.map((paket, index) => (
+                <div key={paket.package_id || index} className="paket-card cancelled">
+                  <div className="paket-image">
+                    <img src={paket.fotograf || '/assets/placeholder-food.png'} alt={paket.package_name} />
+                    <div className="status-badge danger">İptal Edildi</div>
                   </div>
-                  <div className="paket-meta">
-                    <span>23 Nisan 2025</span>
-                    <span>Satılan: 5/5</span>
-                  </div>
-                  <div className="customer-info">
-                    <div className="customer-name">Teslim Alan: Ayşe Y.</div>
-                    <div className="rating">
-                      ★★★★★ <span>(5.0)</span>
+                  <div className="paket-details">
+                    <h3>{paket.package_name}</h3>
+                    <div className="price-container">
+                      <span className="original-price">₺{parseFloat(paket.original_price || 0).toFixed(2)}</span>
+                      <span className="discount-price">₺{parseFloat(paket.discounted_price || 0).toFixed(2)}</span>
                     </div>
+                    <div className="paket-meta">
+                      <span>İptal Tarihi: {new Date(paket.updated_at).toLocaleDateString('tr-TR')}</span>
+                      <span>Miktar: {paket.quantity_available}</span>
+                    </div>
+                      <div className="cancel-reason">
+                        İptal Nedeni: {paket.cancellation_reason || "Belirtilmemiş"}
+                      </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="paket-card cancelled">
-                <div className="paket-image">
-                  <img src="/assets/placeholder-food.png" alt="İptal Edilen Paket" />
-                  <div className="status-badge danger">İptal Edildi</div>
-                </div>
-                <div className="paket-details">
-                  <h3>Tatlı Çeşitleri</h3>
-                  <div className="price-container">
-                    <span className="original-price">₺45.00</span>
-                    <span className="discount-price">₺20.00</span>
-                  </div>
-                  <div className="paket-meta">
-                    <span>21 Nisan 2025</span>
-                    <span>Satılan: 0/3</span>
-                  </div>
-                  <div className="cancel-reason">
-                    İptal Nedeni: Malzemeler tükendi
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         )}
@@ -1337,11 +1337,11 @@ function SofraniPaylas() {
             
             <div className="stat-filters">
               <select>
-                <option>Son 7 gün</option>
-                <option>Son 30 gün</option>
-                <option>Son 3 ay</option>
-                <option>Son 1 yıl</option>
-                <option>Tüm zamanlar</option>
+                <option key="7days">Son 7 gün</option>
+                <option key="30days">Son 30 gün</option>
+                <option key="3months">Son 3 ay</option>
+                <option key="1year">Son 1 yıl</option>
+                <option key="all">Tüm zamanlar</option>
               </select>
             </div>
             

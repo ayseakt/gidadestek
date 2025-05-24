@@ -1,42 +1,245 @@
-import api from './api';
+// services/locationService.js - Frontend versiyonu
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5051/api';
 
-// API'nizin temel URL'si (sunucu adresinize göre değiştirin)
-const API_URL = 'http://localhost:5051/api'// veya kendi backend URL'niz
-
-// Konum işlemleri için servis
-const locationService = {
-  // Tüm konumları getir
-  getAllLocations: async () => {
+class LocationService {
+  
+  // TÜM LOKASYONLARİ GETİR - EKLENDİ
+  static async getAllLocations() {
     try {
-      return await api.get(`${API_URL}/locations`);
+      const response = await fetch(`${API_BASE_URL}/locations`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Lokasyonlar alınamadı');
+      }
+      
+      return {
+        success: true,
+        data: result.data || result
+      };
     } catch (error) {
-      console.error('Konumlar getirilirken hata oluştu:', error);
-      throw error;
+      return {
+        success: false,
+        message: error.message,
+        data: []
+      };
     }
-  },
+  }
 
-  // ID'ye göre tek bir konum getir
-  getLocationById: async (id) => {
+  // Kullanıcının tüm adreslerini getir
+  static async getUserAddresses(userId) {
     try {
-      return await api.get(`${API_URL}/locations/${id}`);
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/addresses`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}` // Token varsa
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Adresler alınamadı');
+      }
+      
+      return {
+        success: true,
+        data: result.data
+      };
     } catch (error) {
-      console.error(`ID ${id} olan konum getirilirken hata oluştu:`, error);
-      throw error;
+      return {
+        success: false,
+        message: error.message
+      };
     }
-  },
+  }
 
-  // Yeni konum ekle (gerekirse)
-  createLocation: async (locationData) => {
+  // Varsayılan adresi getir
+  static async getDefaultAddress(userId) {
     try {
-      return await api.post(`${API_URL}/locations`, locationData);
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/addresses/default`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Varsayılan adres alınamadı');
+      }
+      
+      return {
+        success: true,
+        data: result.data
+      };
     } catch (error) {
-      console.error('Konum oluşturulurken hata oluştu:', error);
-      throw error;
+      return {
+        success: false,
+        message: error.message
+      };
     }
-  },
+  }
 
-  // Diğer konum işlemleri buraya eklenebilir
-  // ...
-};
+  // Yeni adres ekle
+  static async addAddress(userId, addressData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/addresses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(addressData)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Adres eklenemedi');
+      }
+      
+      return {
+        success: true,
+        data: result.data,
+        message: 'Adres başarıyla eklendi'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
 
-export default locationService;
+  // Adres güncelle
+  static async updateAddress(userId, locationId, updateData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/addresses/${locationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Adres güncellenemedi');
+      }
+      
+      return {
+        success: true,
+        data: result.data,
+        message: 'Adres başarıyla güncellendi'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
+
+  // Adres sil
+  static async deleteAddress(userId, locationId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/addresses/${locationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Adres silinemedi');
+      }
+      
+      return {
+        success: true,
+        message: 'Adres başarıyla silindi'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
+
+  // Varsayılan adres değiştir
+  static async setDefaultAddress(userId, locationId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/addresses/${locationId}/set-default`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Varsayılan adres değiştirilemedi');
+      }
+      
+      return {
+        success: true,
+        data: result.data,
+        message: 'Varsayılan adres değiştirildi'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
+
+  // Yakın adresler bul
+  static async findNearbyAddresses(latitude, longitude, radiusKm = 5) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/addresses/nearby?lat=${latitude}&lng=${longitude}&radius=${radiusKm}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Yakın adresler alınamadı');
+      }
+      
+      return {
+        success: true,
+        data: result.data
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
+}
+
+export default LocationService;

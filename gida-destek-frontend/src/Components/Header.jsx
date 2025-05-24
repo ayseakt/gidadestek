@@ -9,13 +9,19 @@ import {
   FaTimes, 
   FaLeaf, 
   FaShoppingBag,
-  FaFilter 
+  FaFilter,
+  FaShoppingCart,
+  FaTrash
 } from 'react-icons/fa';
+
 import MyOrders from './MyOrders';
 import AddressButton from './AddressButton';
 import authService from '../services/AuthService'; // Yeni auth servisi ekleyelim
-
+import { getUserProfile, getSellerProfile } from '../services/userService';
+import { useCart } from '../contexts/cartContext';
 function Header({ onLogout }) { // onLogout prop'unu alalım
+  const [showProfileWarning, setShowProfileWarning] = useState(false);
+  const [showCreateSellerProfile, setShowCreateSellerProfile] = useState(false);
   const navigate = useNavigate();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -27,8 +33,7 @@ function Header({ onLogout }) { // onLogout prop'unu alalım
   const [selectedDate, setSelectedDate] = useState('');
   const [activeUserType, setActiveUserType] = useState('business'); // 'business' veya 'individual'
   const [notificationCount, setNotificationCount] = useState(3); // Bildirim sayısı
-  const [cartCount, setCartCount] = useState(0); // Sepet sayısı
-  const [cartItems, setCartItems] = useState([]);
+  const { cartItems, cartCount, removeFromCart, clearCart } = useCart();
   const [userProfile, setUserProfile] = useState({
     name: 'Ahmet Yılmaz',
     profileImage: null // Kullanıcı resmi yoksa null, varsa URL'i burada olacak
@@ -52,37 +57,153 @@ function Header({ onLogout }) { // onLogout prop'unu alalım
   };
 
   // Scroll olayını dinleyen useEffect
-  useEffect(() => {
-    const checkAuth = () => {
-      const isAuth = authService.isAuthenticated();
-      setIsAuthenticated(isAuth);
-      
-      // Kullanıcı bilgilerini getir
-      if (isAuth) {
-        const user = authService.getUser();
-        if (user) {
+// Header.jsx içindeki düzeltilmiş checkAuth fonksiyonu
+
+useEffect(() => {
+  const checkAuth = async () => {
+    const isAuth = authService.isAuthenticated();
+    setIsAuthenticated(isAuth);
+    
+    // Kullanıcı bilgilerini getir
+    if (isAuth) {
+      try {
+        let profileData;
+        
+        if (isDonorMode) {
+          // Satıcı modunda seller profili getir
+          const sellerResult = await getSellerProfile();
+          
+          if (sellerResult && sellerResult.success) {
+            // Profil tamamlanmış mı kontrolü
+            if (sellerResult.data && !sellerResult.data.isProfileComplete) {
+              setShowProfileWarning(true);
+            }
+            
+            profileData = {
+              name: sellerResult.data?.business_name || 'İşletme Adı Belirtilmemiş',
+              profileImage: sellerResult.data?.profileImage || null,
+              type: 'seller',
+              ...sellerResult.data
+            };
+          } else if (sellerResult && sellerResult.needsProfile) {
+            // Seller profili oluşturulması gerekiyor
+            setShowCreateSellerProfile(true);
+            
+            // Fallback olarak normal user bilgilerini kullan
+            const user = authService.getUser();
+            if (user) {
+              profileData = {
+                name: user.name || 'Kullanıcı',
+                profileImage: user.profileImage || null,
+                type: 'user'
+              };
+            }
+          } else {
+            // Seller profili alınamadıysa fallback
+            console.warn('Seller profili alınamadı, fallback kullanılıyor');
+            const user = authService.getUser();
+            if (user) {
+              profileData = {
+                name: user.name || 'Kullanıcı',
+                profileImage: user.profileImage || null,
+                type: 'user'
+              };
+            }
+          }
+        } else {
+          // Alışveriş modunda user profili getir
+          const userResult = await getUserProfile();
+          
+          if (userResult && userResult.success) {
+            profileData = {
+              name: userResult.data?.name || 'Kullanıcı',
+              profileImage: userResult.data?.profileImage || null,
+              type: 'user',
+              ...userResult.data
+            };
+          } else {
+            // User profili alınamadıysa fallback
+            console.warn('User profili alınamadı, fallback kullanılıyor');
+            const user = authService.getUser();
+            if (user) {
+              profileData = {
+                name: user.name || 'Kullanıcı',
+                profileImage: user.profileImage || null,
+                type: 'user'
+              };
+            }
+          }
+        }
+        
+        // Profil verisi varsa state'i güncelle
+        if (profileData) {
+          setUserProfile(profileData);
+        } else {
+          // Hiçbir profil verisi yoksa varsayılan değerleri kullan
+          console.warn('Profil verisi bulunamadı, varsayılan değerler kullanılıyor');
           setUserProfile({
-            name: user.name || 'Kullanıcı',
-            profileImage: user.profileImage || null
+            name: 'Kullanıcı',
+            profileImage: null,
+            type: 'user'
+          });
+        }
+        
+      } catch (error) {
+        console.error('Profil bilgisi alınamadı:', error);
+        
+        // Hata durumunda fallback olarak localStorage'dan al
+        try {
+          const user = authService.getUser();
+          if (user && typeof user === 'object') {
+            setUserProfile({
+              name: user.name || user.firstName || user.username || 'Kullanıcı',
+              profileImage: user.profileImage || user.avatar || null,
+              type: 'user'
+            });
+          } else {
+            // Son çare olarak varsayılan değerler
+            setUserProfile({
+              name: 'Kullanıcı',
+              profileImage: null,
+              type: 'user'
+            });
+          }
+        } catch (fallbackError) {
+          console.error('Fallback profil bilgisi de alınamadı:', fallbackError);
+          setUserProfile({
+            name: 'Kullanıcı',
+            profileImage: null,
+            type: 'user'
           });
         }
       }
-    };
-    
-    checkAuth();
-    
-    // Token değişimini dinlemek için event listener
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'authToken' || e.key === 'token' || e.key === 'user') {
-        checkAuth();
-      }
-    });
-    
-    return () => {
-      window.removeEventListener('storage', checkAuth);
-    };
-  }, []);
-    useEffect(() => {
+    } else {
+      // Kullanıcı giriş yapmamışsa varsayılan değerler
+      setUserProfile({
+        name: 'Misafir',
+        profileImage: null,
+        type: 'guest'
+      });
+    }
+  };
+  
+  checkAuth();
+  
+  // Token değişimini dinlemek için event listener
+  const handleStorageChange = (e) => {
+    if (e.key === 'authToken' || e.key === 'token' || e.key === 'user') {
+      checkAuth();
+    }
+  };
+  
+  window.addEventListener('storage', handleStorageChange);
+  
+  return () => {
+    window.removeEventListener('storage', handleStorageChange);
+  };
+}, [isDonorMode]); // isDonorMode dependency olarak eklendi
+
+  useEffect(() => {
     const handleScroll = () => {
       const scrollPosition = window.scrollY;
       setIsScrolled(scrollPosition > 100);
@@ -95,39 +216,41 @@ function Header({ onLogout }) { // onLogout prop'unu alalım
   }, []);
 
   // Profile menüsünü dışarı tıklandığında kapatma
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isProfileMenuOpen && !event.target.closest('.profile-button-wrapper')) {
-        setIsProfileMenuOpen(false);
-      }
-      if (notificationMenuOpen && !event.target.closest('.notification-button-wrapper')) {
-        setNotificationMenuOpen(false);
-      }
-      if (cartMenuOpen && !event.target.closest('.cart-button-wrapper')) {
-        setCartMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isProfileMenuOpen, notificationMenuOpen, cartMenuOpen]);
-
-  useEffect(() => {
-    // LocalStorage'dan sepet verilerini yükle
-    const savedCart = localStorage.getItem('cartItems');
-    if (savedCart) {
-      const parsedCart = JSON.parse(savedCart);
-      setCartItems(parsedCart);
-      setCartCount(parsedCart.length);
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (
+      isProfileMenuOpen &&
+      !event.target.closest('.profile-button-wrapper')
+    ) {
+      setIsProfileMenuOpen(false);
     }
-  }, []);
 
-  // Sepet değiştiğinde localstorage'a kaydetme
-  useEffect(() => {
-    localStorage.setItem('cartItems', JSON.stringify(cartItems));
-  }, [cartItems]);
+    if (
+      notificationMenuOpen &&
+      !event.target.closest('.notification-button-wrapper')
+    ) {
+      setNotificationMenuOpen(false);
+    }
+
+    if (
+      cartMenuOpen &&
+      !event.target.closest('.cart-button-wrapper') &&
+      !event.target.closest('.cart-modal')
+    ) {
+      setCartMenuOpen(false);
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [isProfileMenuOpen, notificationMenuOpen, cartMenuOpen]);
+
+
+
+
+
 
   const handleSearchBarClick = () => {
     setShowSearchPanel(true);
@@ -199,23 +322,9 @@ function Header({ onLogout }) { // onLogout prop'unu alalım
     if (notificationMenuOpen) setNotificationMenuOpen(false);
   };
 
-  const removeFromCart = (index) => {
-    const newCartItems = [...cartItems];
-    newCartItems.splice(index, 1);
-    setCartItems(newCartItems);
-    setCartCount(newCartItems.length);
-  };
 
-  const clearCart = () => {
-    setCartItems([]);
-    setCartCount(0);
-  };
 
-  // Sepete ürün ekleme fonksiyonu - Home.jsx'den çağrılacak
-  const addToCart = (item) => {
-    setCartItems([...cartItems, item]);
-    setCartCount(cartCount + 1);
-  };
+
 
   // Favori işlemlerinin yönetilmesi
   const [favorites, setFavorites] = useState([]);
@@ -356,49 +465,6 @@ function Header({ onLogout }) { // onLogout prop'unu alalım
                 )}
               </div>
 
-              {cartMenuOpen && (
-                <div className="cart-menu">
-                  <div className="cart-header">
-                    <h3>Sepetim</h3>
-                    {cartItems.length > 0 && (
-                      <button className="clear-cart-button" onClick={clearCart}>Temizle</button>
-                    )}
-                  </div>
-                  
-                  {cartItems.length > 0 ? (
-                    <>
-                      <ul className="cart-items">
-                        {cartItems.map((item, index) => (
-                          <li key={index} className="cart-item">
-                            <div className="cart-item-image">
-                              <img src={item.image || "https://via.placeholder.com/50"} alt={item.product} />
-                            </div>
-                            <div className="cart-item-details">
-                              <div className="cart-item-name">{item.storeName}</div>
-                              <div className="cart-item-product">{item.product}</div>
-                              <div className="cart-item-price">₺{item.newPrice.toFixed(2)}</div>
-                            </div>
-                            <button className="remove-button" onClick={() => removeFromCart(index)}>
-                              <FaTimes />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="cart-total">
-                        <span>Toplam:</span>
-                        <span>₺{cartItems.reduce((total, item) => total + item.newPrice, 0).toFixed(2)}</span>
-                      </div>
-                      <button className="checkout-button" onClick={() => navigate('/odeme')}>
-                        Ödeme Yap
-                      </button>
-                    </>
-                  ) : (
-                    <div className="empty-cart">
-                      <p>Sepetinizde ürün bulunmamaktadır.</p>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
           
@@ -562,6 +628,95 @@ function Header({ onLogout }) { // onLogout prop'unu alalım
           </div>
         </div>
       )}
+      {cartMenuOpen && (
+      <div className="cart-modal-overlay" onClick={() => setCartMenuOpen(false)}>
+        <div className="cart-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="cart-header">
+            <h3>🛒 Sepetim</h3>
+            <button className="close-cart-button" onClick={() => setCartMenuOpen(false)}>
+              <FaTimes />
+            </button>
+          </div>
+          
+          <div className="cart-content">
+            {cartItems.length === 0 ? (
+              <div className="empty-cart">
+                <FaShoppingCart className="empty-cart-icon" />
+                <h4>Sepetiniz boş</h4>
+                <p>Henüz hiç ürün eklememişsiniz.</p>
+              </div>
+            ) : (
+              <>
+                <div className="cart-items">
+                  {cartItems.map((item, index) => (
+                    <div key={index} className="cart-item">
+                      <div className="cart-item-image">
+                        <img 
+                          src={item.image || "https://via.placeholder.com/80"} 
+                          alt={item.product} 
+                        />
+                      </div>
+                      
+                      <div className="cart-item-info">
+                        <h4>{item.product}</h4>
+                        <p>{item.storeName}</p>
+                        <div className="cart-item-price">
+                          ₺{item.newPrice.toFixed(2)}
+                        </div>
+                      </div>
+                      
+                        <button 
+                          className="remove-item-btn" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            removeFromCart(item.cartId);
+                          }}
+                        >
+                          <FaTrash />
+                        </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="cart-summary">
+                  <div className="cart-total">
+                    <div className="total-items">
+                      Toplam {cartItems.length} ürün
+                    </div>
+                    <div className="total-price">
+                      ₺{cartItems.reduce((total, item) => total + item.newPrice, 0).toFixed(2)}
+                    </div>
+                  </div>
+                  
+                  <div className="cart-actions">
+                    <button 
+                      className="clear-cart-btn" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        clearCart();
+                      }}
+                    >
+                      🗑️ Sepeti Temizle
+                    </button>
+                    <button 
+                      className="checkout-btn"
+                      onClick={() => {
+                        navigate('/odeme');
+                      }}
+                    >
+                      💳 Ödemeye Geç
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
     </>
   );
 }

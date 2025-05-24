@@ -38,6 +38,7 @@ module.exports = (req, res, next) => {
     // Kullanıcı bilgilerini request nesnesine ekle
     req.user = {
       id: decoded.id,
+      user_id: decoded.id, // ⭐ EKLENEN: Tutarlılık için
       email: decoded.email
     };
     

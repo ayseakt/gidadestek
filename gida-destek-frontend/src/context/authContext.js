@@ -1,4 +1,4 @@
-// src/context/AuthContext.js dosyasını oluştur
+// src/context/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import authService from '../services/AuthService';
 
@@ -17,7 +17,18 @@ export const AuthProvider = ({ children }) => {
         // Kullanıcı bilgilerini al
         try {
           const userData = authService.getUserInfo();
-          setUser(userData);
+          console.log('AuthContext - Raw user data:', userData);
+          
+          // Kullanıcı verisini normalize et
+          const normalizedUser = {
+            ...userData,
+            id: userData.id || userData.user_id || userData.userId,
+            user_id: userData.user_id || userData.id || userData.userId,
+            userId: userData.userId || userData.id || userData.user_id
+          };
+          
+          console.log('AuthContext - Normalized user:', normalizedUser);
+          setUser(normalizedUser);
         } catch (error) {
           console.error("Kullanıcı bilgileri alınamadı", error);
         }

@@ -10,6 +10,8 @@ router.use(authMiddleware);
 
 // Paket oluşturma
 router.post('/', upload.none(), packageController.createPackage);
+// Tüm aktif paketleri getir (alışveriş için - tüm satıcılardan)
+router.get('/all-active', packageController.getAllActivePackagesForShopping);
 
 // ⭐ Önemli: Spesifik route'lar parametre içeren route'lardan ÖNCE tanımlanmalı
 // Aktif paketleri getir

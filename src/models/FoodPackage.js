@@ -12,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     location_id: {
       type: DataTypes.INTEGER,
-      allowNull: true, // Manuel lokasyon girilebildiği için null olabilir
+      allowNull: true,
     },
     category_id: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -86,6 +86,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       defaultValue: 1
     },
+    cancellation_reason: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      defaultValue: null
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: true,
@@ -103,21 +108,17 @@ module.exports = (sequelize, DataTypes) => {
     updatedAt: 'updated_at'
   });
 
-  // ⭐ ÖNEMLİ: Model ilişkilerini tanımla
   FoodPackage.associate = function(models) {
-    // PackageLocation ile one-to-one ilişki
     FoodPackage.hasOne(models.PackageLocation, {
       foreignKey: 'package_id',
       as: 'location'
     });
 
-    // Seller ile many-to-one ilişki (bir satıcının birden fazla paketi olabilir)
     FoodPackage.belongsTo(models.Seller, {
       foreignKey: 'seller_id',
       as: 'seller'
     });
 
-    // Category ile many-to-one ilişki
     if (models.Category) {
       FoodPackage.belongsTo(models.Category, {
         foreignKey: 'category_id',

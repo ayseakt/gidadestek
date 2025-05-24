@@ -56,7 +56,20 @@ const packageService = {
    */
   getPackageStats: () => {
     return api.get('/packages/stats');
-  }
+  },
+    getAllActivePackages: () => {
+    return api.get('/packages/all-active');
+  },
+
+  /**
+   * Kullanıcının kendi paketlerini getirir
+   */
+  getMyPackages: () => {
+    return api.get('/packages/my-packages');
+  },
+  getAllActivePackages: () => {
+  return api.get('/packages/all-active');
+},
   
 };
 

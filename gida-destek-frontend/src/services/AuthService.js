@@ -1,19 +1,16 @@
-// AuthService.js - Yeni dosya oluşturalım
+// AuthService.js - İyileştirilmiş versiyon
 
 /**
  * Kimlik doğrulama işlemlerini merkezileştiren servis sınıfı
  */
 class AuthService {
   constructor() {
-    this.tokenKey = 'authToken'; // Varsayılan token anahtarı
-    this.userKey = 'user'; // Varsayılan kullanıcı anahtarı
+    this.tokenKey = 'authToken';
+    this.userKey = 'user';
   }
 
   /**
    * Kullanıcı giriş işlemi
-   * @param {Object} credentials - Kullanıcı bilgileri {email, password}
-   * @param {Function} apiLoginFn - API login fonksiyonu
-   * @returns {Promise} Login sonucu
    */
   async login(credentials, apiLoginFn) {
     try {
@@ -46,18 +43,28 @@ class AuthService {
    * Oturumu sonlandırma
    */
   logout() {
-    localStorage.removeItem(this.tokenKey);
-    localStorage.removeItem(this.userKey);
-    sessionStorage.removeItem(this.tokenKey);
-    sessionStorage.removeItem(this.userKey);
+    // Tüm olası token key'lerini temizle
+    const keysToRemove = [
+      this.tokenKey, this.userKey, 
+      'token', 'user', 'userData', 'userToken',
+      'authToken', 'auth_token'
+    ];
+    
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
   }
 
   /**
    * Token kaydetme
-   * @param {string} token - JWT token
-   * @param {boolean} rememberMe - Oturumu hatırla seçeneği
    */
   setToken(token, rememberMe = true) {
+    if (!token) {
+      console.warn('Boş token kaydetilmeye çalışıldı');
+      return;
+    }
+    
     if (rememberMe) {
       localStorage.setItem(this.tokenKey, token);
     } else {
@@ -67,55 +74,73 @@ class AuthService {
 
   /**
    * Kullanıcı bilgisini kaydetme
-   * @param {Object} user - Kullanıcı bilgileri
-   * @param {boolean} rememberMe - Oturumu hatırla seçeneği
    */
   setUser(user, rememberMe = true) {
-    if (rememberMe) {
-      localStorage.setItem(this.userKey, JSON.stringify(user));
-    } else {
-      sessionStorage.setItem(this.userKey, JSON.stringify(user));
+    if (!user || typeof user !== 'object') {
+      console.warn('Geçersiz kullanıcı verisi kaydetilmeye çalışıldı:', user);
+      return;
+    }
+    
+    try {
+      const userString = JSON.stringify(user);
+      if (rememberMe) {
+        localStorage.setItem(this.userKey, userString);
+      } else {
+        sessionStorage.setItem(this.userKey, userString);
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgisi kaydetme hatası:', error);
     }
   }
 
   /**
    * Token alma
-   * @returns {string|null} Kayıtlı token
    */
   getToken() {
-    return (
-      localStorage.getItem(this.tokenKey) || 
-      sessionStorage.getItem(this.tokenKey) ||
-      localStorage.getItem('token') || // Alternatif isimler
-      sessionStorage.getItem('token') ||
-      localStorage.getItem('userToken') ||
-      sessionStorage.getItem('userToken')
-    );
+    const possibleKeys = [
+      this.tokenKey, 'token', 'userToken', 'auth_token'
+    ];
+    
+    for (const key of possibleKeys) {
+      const token = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (token && token.trim()) {
+        return token;
+      }
+    }
+    
+    return null;
   }
 
   /**
-   * Kullanıcı bilgisi alma
-   * @returns {Object|null} Kayıtlı kullanıcı
+   * Kullanıcı bilgisi alma - Geliştirilmiş
    */
   getUser() {
-    const userStr = (
-      localStorage.getItem(this.userKey) || 
-      sessionStorage.getItem(this.userKey) ||
-      localStorage.getItem('userData') || // Alternatif isimler
-      sessionStorage.getItem('userData')
-    );
+    const possibleKeys = [
+      this.userKey, 'user', 'userData', 'userInfo'
+    ];
     
-    try {
-      return userStr ? JSON.parse(userStr) : null;
-    } catch (e) {
-      console.error('Kullanıcı bilgisi parse hatası:', e);
-      return null;
+    for (const key of possibleKeys) {
+      const userStr = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (userStr && userStr.trim()) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && typeof user === 'object') {
+            return user;
+          }
+        } catch (error) {
+          console.warn(`${key} anahtarındaki kullanıcı bilgisi parse edilemedi:`, error);
+          // Hatalı veriyi temizle
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        }
+      }
     }
+    
+    return null;
   }
 
   /**
    * Kullanıcının oturum açıp açmadığını kontrol eder
-   * @returns {boolean} Oturum durumu
    */
   isAuthenticated() {
     const token = this.getToken();
@@ -124,20 +149,52 @@ class AuthService {
       return false;
     }
 
-    // Opsiyonel: Token süresi kontrolü
+    // JWT token süresi kontrolü
     try {
-      // JWT token basit süresi kontrol (token'ın payload kısmını decode et)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        this.logout(); // Süresi geçmiş token, oturumu kapat
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) {
+        console.warn('Geçersiz JWT token formatı');
         return false;
       }
-    } catch (e) {
-      // Token parse edilemezse, normal devam et
-      console.warn('Token süresi kontrol edilemedi');
+      
+      const payload = JSON.parse(atob(tokenParts[1]));
+      
+      // Token süresi kontrolü
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        console.warn('Token süresi dolmuş');
+        this.logout();
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.warn('Token süresi kontrol edilemedi, token geçerli kabul ediliyor:', error);
+      return true; // Parse edilemeyen tokenları geçerli kabul et
     }
-    
-    return true;
+  }
+
+  /**
+   * Kullanıcı bilgilerini güncelle
+   */
+  updateUser(updates) {
+    const currentUser = this.getUser();
+    if (currentUser && typeof updates === 'object') {
+      const updatedUser = { ...currentUser, ...updates };
+      this.setUser(updatedUser);
+      return updatedUser;
+    }
+    return null;
+  }
+
+  /**
+   * Debugging için kullanıcı durumunu logla
+   */
+  debugAuthState() {
+    console.log('=== Auth Debug Info ===');
+    console.log('Token:', this.getToken() ? 'Mevcut' : 'Yok');
+    console.log('User:', this.getUser());
+    console.log('Is Authenticated:', this.isAuthenticated());
+    console.log('========================');
   }
 }
 

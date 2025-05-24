@@ -346,6 +346,7 @@ const cancelPackage = async (req, res) => {
     // ⭐ GÜNCELLEME: Paketi silmek yerine is_active = 0 yap
     await package.update({
       is_active: 0,
+      cancellation_reason: req.body.cancellation_reason || "Satıcı tarafından iptal edildi",
       updated_at: new Date()
     });
 
@@ -451,6 +452,36 @@ const updatePackage = async (req, res) => {
     });
   }
 };
+// ⭐ YENİ: Tüm aktif paketleri getir (alışveriş için)
+const getAllActivePackagesForShopping = async (req, res) => {
+  try {
+    const packages = await FoodPackage.findAll({
+      where: { 
+        is_active: 1 
+      },
+      include: [
+        {
+          model: PackageLocation,
+          as: 'location',
+          required: false
+        },
+        {
+          model: Seller,
+          as: 'seller',
+          required: true,
+          attributes: ['seller_id', 'business_name', 'user_id']
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    console.log('Tüm aktif paketler alındı:', packages.length);
+    res.status(200).json({ success: true, data: packages });
+  } catch (error) {
+    console.error('Tüm aktif paketler alınırken hata:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
+  }
+};
 
 module.exports = {
   createPackage,
@@ -459,5 +490,6 @@ module.exports = {
   getPackageHistory,
   getMyPackages,
   cancelPackage,
-  updatePackage
+  updatePackage,
+  getAllActivePackagesForShopping
 };

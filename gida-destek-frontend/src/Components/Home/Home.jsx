@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Home.css';
-import resim1 from './resim1.jpg';
-import resim2 from './resim2.jpg';
-import resim3 from './resim3.jpg';
-import resim4 from './resim4.jpg';
 import DonationCard from './DonationCard';
 import { 
   FaUser, 
@@ -21,110 +17,259 @@ import {
   FaSmile,
   FaPizzaSlice,
   FaBolt,
-  FaWindowClose
+  FaWindowClose,
+  FaFilter,
+  FaSortAmountDown,
+  FaShoppingCart,
+  FaPlus,
+  FaMinus,
+  FaTrash
 
 } from 'react-icons/fa';
 import FilterSidebar from './FilterSidebar';
-
-
-
-
-
-
+import packageService from '../../services/packageService';
+import cartService from '../../services/cartServices';
+import { useCart } from '../../contexts/cartContext';
 const Home = () => {
- const [sortOption, setSortOption] = useState('alphabetical'); // varsayılan değer verilebilir
-
-  const [product, setProduct] = useState([]);
+  const { addToCart } = useCart();
+  const [sortOption, setSortOption] = useState('distance');
+  const [realPackages, setRealPackages] = useState([]);
+  const [isLoadingPackages, setIsLoadingPackages] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Tümü');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState([]);
+  const [cartCount, setCartCount] = useState(0);
+  const [showCart, setShowCart] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [favorites, setFavorites] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [impactStats, setImpactStats] = useState({
-    savedFood: 2035,
-    co2Reduced: 4532,
-    userCount: 12567,
+    savedFood: 0,
+    co2Reduced: 0,
+    userCount: 0,
   });
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showLocationPermission, setShowLocationPermission] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   
-
   const categories = ['Tümü', 'Restoran', 'Fırın & Pastane', 'Market', 'Kafe', 'Manav', 'Diğer'];
 
-  const allBusinesses = [
-    {
-      storeName: 'Fırın Cafe',
-      product: 'Karma Paket',
-      oldPrice: 120,
-      newPrice: 40,
-      distance: '300m',
-      time: '18:00-19:00',
-      category: 'Fırın & Pastane',
-      id: 1,
-      image: resim1 ,
-      savedCount: 24,
-      location: { lat: 41.0082, lng: 28.9784 } // Istanbul coordinates - adjust for your businesses
-    },
-    {
-      storeName: 'Ada Market',
-      product: 'Meyve Paketi',
-      oldPrice: 80,
-      newPrice: 25,
-      distance: '500m',
-      time: '20:00-21:00',
-      category: 'Market',
-      id: 2,
-      image: resim2,
-      savedCount: 18,
-      location: { lat: 41.0102, lng: 28.9762 }
-    },
-    {
-      storeName: 'Lezzet Köşesi',
-      product: 'Akşam Menüsü',
-      oldPrice: 250,
-      newPrice: 85,
-      distance: '750m',
-      time: '21:00-22:00',
-      category: 'Restoran',
-      id: 3,
-      image: resim3,
-      savedCount: 32,
-      location: { lat: 41.0056, lng: 28.9726 }
-    },
-    {
-      storeName: 'Tatlı Dünyası',
-      product: 'Tatlı Paketi',
-      oldPrice: 90,
-      newPrice: 30,
-      distance: '450m',
-      time: '19:00-20:00',
-      category: 'Fırın & Pastane',
-      id: 4,
-      image: resim4,
-      savedCount: 15,
-      location: { lat: 41.0122, lng: 28.9802 }
-    },
-    {
-      storeName: 'Organik Bahçe',
-      product: 'Sebze Paketi',
-      oldPrice: 70,
-      newPrice: 25,
-      distance: '600m',
-      time: '19:30-20:30',
-      category: 'Manav',
-      id: 5,
-      image: 'https://via.placeholder.com/150',
-      savedCount: 28,
-      location: { lat: 41.0072, lng: 28.9892 }
-    },
-  ];
+  // Maksimum mesafe sınırı (km)
+  const MAX_DISTANCE_KM = 10;
 
-  // Load Google Maps API script
+  const loadRealPackages = async () => {
+    try {
+      setIsLoadingPackages(true);
+      const response = await packageService.getAllActivePackages();
+      if (response.data.success) {
+        console.log('Paketler yüklendi:', response.data.data);
+        setRealPackages(response.data.data);
+        
+        const totalPackages = response.data.data.length;
+        setImpactStats({
+          savedFood: totalPackages * 2,
+          co2Reduced: totalPackages * 3,
+          userCount: Math.floor(totalPackages * 1.5),
+        });
+      }
+    } catch (error) {
+      console.error('Paketler yüklenirken hata:', error);
+    } finally {
+      setIsLoadingPackages(false);
+    }
+  };
+
+  // Sepet sayısını getir
+  const loadCartCount = async () => {
+    try {
+      const response = await cartService.getCartCount();
+      if (response.data.success) {
+        setCartCount(response.data.data.count);
+      }
+    } catch (error) {
+      console.error('Sepet sayısı alınırken hata:', error);
+    }
+  };
+
+  // Sepeti getir
+  const loadCart = async () => {
+    try {
+      const response = await cartService.getCart();
+      if (response.data.success) {
+        setCart(response.data.data.items);
+      }
+    } catch (error) {
+      console.error('Sepet getirilirken hata:', error);
+    }
+  };
+
+  // Sepete ekle
+const handleAddToCart = async (business, quantity = 1) => {
+  console.log('=== HANDLE ADD TO CART DEBUG ===');
+  console.log('Business objesi:', business);
+  console.log('Business objesi keys:', Object.keys(business));
+  console.log('business.id:', business.id, 'Type:', typeof business.id);
+  console.log('business.realId:', business.realId, 'Type:', typeof business.realId);
+  console.log('business.packageId:', business.packageId, 'Type:', typeof business.packageId);
+  
+  if (business.isOwnPackage) {
+    alert('Kendi paketinizi sepete ekleyemezsiniz!');
+    return;
+  }
+
+  try {
+    let packageId;
+    
+    // ⭐ DÜZELTME: Sadece integer ID'leri kullan
+    if (business.realId !== undefined && business.realId !== null && typeof business.realId === 'number') {
+      packageId = business.realId;
+      console.log('✅ realId kullanıldı:', packageId, 'Type:', typeof packageId);
+    } else if (business.packageId !== undefined && business.packageId !== null && typeof business.packageId === 'number') {
+      packageId = business.packageId;
+      console.log('✅ packageId kullanıldı:', packageId, 'Type:', typeof packageId);
+    } else if (business.id !== undefined && business.id !== null && typeof business.id === 'number') {
+      packageId = business.id;
+      console.log('✅ id kullanıldı:', packageId, 'Type:', typeof packageId);
+    } else {
+      // ⭐ Son çare: String parse etmeye çalış
+      console.warn('⚠️ Numeric ID bulunamadı, string parse deneniyor...');
+      
+      let stringId = business.realId || business.packageId || business.id;
+      console.log('String parse denenen değer:', stringId, 'Type:', typeof stringId);
+      
+      if (typeof stringId === 'string' && stringId.startsWith('real_')) {
+        const parsed = parseInt(stringId.replace('real_', ''), 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          packageId = parsed;
+          console.log('✅ String parse başarılı:', packageId);
+        }
+      } else if (typeof stringId === 'string') {
+        const parsed = parseInt(stringId, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          packageId = parsed;
+          console.log('✅ Direct string parse başarılı:', packageId);
+        }
+      }
+      
+      if (!packageId) {
+        console.error('❌ Hiçbir geçerli ID bulunamadı!');
+        console.error('Business objesi detayları:', {
+          id: business.id,
+          idType: typeof business.id,
+          realId: business.realId,
+          realIdType: typeof business.realId,
+          packageId: business.packageId,
+          packageIdType: typeof business.packageId,
+          allKeys: Object.keys(business)
+        });
+        alert('Paket ID\'si bulunamadı veya geçersiz');
+        return;
+      }
+    }
+
+    // ⭐ FINAL VALIDATION
+    if (typeof packageId !== 'number' || isNaN(packageId) || packageId <= 0) {
+      console.error('❌ Final validation failed - Geçersiz packageId:', packageId, 'Type:', typeof packageId);
+      alert('Geçersiz paket ID');
+      return;
+    }
+
+    console.log('✅ FINAL packageId kullanılacak:', packageId, 'Type:', typeof packageId);
+    
+    // ⭐ cartService.addToCart çağrısı
+    const response = await cartService.addToCart(packageId, quantity);
+    
+    if (response.data.success) {
+      await loadCartCount();
+      setImpactStats(prev => ({
+        ...prev,
+        savedFood: prev.savedFood + 1,
+        co2Reduced: prev.co2Reduced + 2,
+      }));
+      
+      alert(`${business.storeName} işletmesinden "${business.product}" ürünü sepete eklendi!`);
+      if (showProductDetail) {
+        setShowProductDetail(false);
+      }
+    }
+    
+  } catch (error) {
+    console.error('handleAddToCart hatası:', error);
+    console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    
+    if (error.response?.status === 400) {
+      console.error('400 Hatası - Request payload:', error.config?.data);
+      console.error('Backend response:', error.response?.data);
+    }
+    if (error.response?.data?.message) {
+      alert(error.response.data.message);
+    } else {
+      alert('Sepete eklenirken bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
+    }
+  }
+};
+  // Sepet öğesi güncelle
+  const handleUpdateCartItem = async (cartItemId, quantity) => {
+    try {
+      if (quantity === 0) {
+        await handleRemoveFromCart(cartItemId);
+        return;
+      }
+
+      const response = await cartService.updateCartItem(cartItemId, quantity);
+      if (response.data.success) {
+        await loadCart();
+        await loadCartCount();
+      }
+    } catch (error) {
+      console.error('Sepet güncelleme hatası:', error);
+      if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      }
+    }
+  };
+
+  // Sepetten kaldır
+  const handleRemoveFromCart = async (cartItemId) => {
+    try {
+      const response = await cartService.removeFromCart(cartItemId);
+      if (response.data.success) {
+        await loadCart();
+        await loadCartCount();
+        alert('Ürün sepetten kaldırıldı');
+      }
+    } catch (error) {
+      console.error('Sepetten kaldırma hatası:', error);
+      if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      }
+    }
+  };
+
+  // Sepeti temizle
+  const handleClearCart = async () => {
+    if (window.confirm('Sepeti tamamen temizlemek istediğinizden emin misiniz?')) {
+      try {
+        const response = await cartService.clearCart();
+        if (response.data.success) {
+          setCart([]);
+          setCartCount(0);
+          alert('Sepet temizlendi');
+        }
+      } catch (error) {
+        console.error('Sepet temizleme hatası:', error);
+      }
+    }
+  };
+
+  // Google Maps API script yükleme
   const loadGoogleMapsScript = () => {
     if (!window.google) {
       const script = document.createElement('script');
@@ -145,12 +290,12 @@ const Home = () => {
     }
   };
 
-  // Initialize map
+  // Harita başlatma
   const initMap = () => {
     if (!window.google || !mapRef.current) return;
 
     const mapOptions = {
-      center: userLocation || { lat: 41.0082, lng: 28.9784 }, // Default to Istanbul if no user location
+      center: userLocation || { lat: 41.0082, lng: 28.9784 },
       zoom: 14,
       styles: [
         {
@@ -164,7 +309,6 @@ const Home = () => {
     const map = new window.google.maps.Map(mapRef.current, mapOptions);
     googleMapRef.current = map;
 
-    // Add user location marker
     if (userLocation) {
       new window.google.maps.Marker({
         position: userLocation,
@@ -172,7 +316,7 @@ const Home = () => {
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 10,
-          fillColor: "#4285F4",
+          fillColor: "#FF6B6B",
           fillOpacity: 1,
           strokeColor: "#FFFFFF",
           strokeWeight: 2
@@ -181,40 +325,41 @@ const Home = () => {
       });
     }
 
-    // Add business markers
-    allBusinesses.forEach((business) => {
-      const marker = new window.google.maps.Marker({
-        position: business.location,
-        map,
-        title: business.storeName,
-        icon: {
-          url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
-        }
-      });
+    validRealPackages.forEach((business) => {
+      if (business.location) {
+        const marker = new window.google.maps.Marker({
+          position: business.location,
+          map,
+          title: business.storeName,
+          icon: {
+            url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+          }
+        });
 
-      // Create info window content
-      const contentString = `
-        <div style="width: 200px; padding: 10px;">
-          <h3 style="margin: 0 0 5px 0;">${business.storeName}</h3>
-          <p style="margin: 0 0 5px 0;">${business.product}</p>
-          <p style="margin: 0 0 5px 0;"><b>₺${business.newPrice.toFixed(2)}</b> <span style="text-decoration: line-through;">₺${business.oldPrice.toFixed(2)}</span></p>
-          <p style="margin: 0 0 5px 0;">Alım Saati: ${business.time}</p>
-        </div>
-      `;
+        const contentString = `
+          <div style="width: 200px; padding: 10px;">
+            <h3 style="margin: 0 0 5px 0;">${business.storeName}</h3>
+            <p style="margin: 0 0 5px 0;">${business.product}</p>
+            <p style="margin: 0 0 5px 0;"><b>₺${business.newPrice.toFixed(2)}</b> <span style="text-decoration: line-through;">₺${business.oldPrice.toFixed(2)}</span></p>
+            <p style="margin: 0 0 5px 0;">Alım Saati: ${business.time}</p>
+          </div>
+        `;
 
-      const infowindow = new window.google.maps.InfoWindow({
-        content: contentString
-      });
+        const infowindow = new window.google.maps.InfoWindow({
+          content: contentString
+        });
 
-      marker.addListener("click", () => {
-        infowindow.open(map, marker);
-      });
+        marker.addListener("click", () => {
+          infowindow.open(map, marker);
+        });
+      }
     });
   };
 
-  // Get user location
+  // Kullanıcı konumunu al
   const getUserLocation = () => {
     if (navigator.geolocation) {
+      setIsLoadingLocation(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const userPos = {
@@ -222,21 +367,176 @@ const Home = () => {
             lng: position.coords.longitude
           };
           setUserLocation(userPos);
+          setIsLoadingLocation(false);
+          console.log('Kullanıcı konumu alındı:', userPos);
           if (showMapView && window.google) {
             initMap();
           }
         },
         (error) => {
-          console.error("Error getting location: ", error);
-          // Default to a location (Istanbul)
+          console.error("Konum alırken hata: ", error);
+          setIsLoadingLocation(false);
           setUserLocation({ lat: 41.0082, lng: 28.9784 });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
         }
       );
     } else {
-      console.log("Geolocation is not supported by this browser.");
+      console.log("Tarayıcı konum desteği sağlamıyor.");
       setUserLocation({ lat: 41.0082, lng: 28.9784 });
     }
   };
+
+  // Mesafe hesaplama (Haversine formülü)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return distance;
+  };
+
+  // Gerçek paket verilerini dönüştür
+// Gerçek paket verilerini dönüştür - Düzeltilmiş versiyon
+const convertRealPackageToBusinessFormat = (packageData) => {
+  if (!packageData || typeof packageData !== 'object') {
+    console.warn('Geçersiz paket verisi:', packageData);
+    return null;
+  }
+
+  if (!packageData.package_id) {
+    console.warn('Eksik package_id:', packageData);
+    return null;
+  }
+
+  // package_id'yi integer olarak kaydet
+  const packageId = parseInt(packageData.package_id);
+  if (isNaN(packageId)) {
+    console.warn('Geçersiz package_id:', packageData.package_id);
+    return null;
+  }
+
+  if (!packageData.location || 
+      !packageData.location.latitude || 
+      !packageData.location.longitude ||
+      packageData.location.latitude === null ||
+      packageData.location.longitude === null) {
+    console.warn('Paket konum verisi eksik:', packageData.package_id);
+    return null;
+  }
+
+  const lat = parseFloat(packageData.location.latitude);
+  const lng = parseFloat(packageData.location.longitude);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    console.warn('Geçersiz koordinatlar:', { lat, lng });
+    return null;
+  }
+
+  let distance = '500m';
+  let actualDistance = 999;
+
+  if (userLocation) {
+    actualDistance = calculateDistance(
+      userLocation.lat, 
+      userLocation.lng, 
+      lat, 
+      lng
+    );
+    
+    distance = actualDistance < 1 ? 
+      `${Math.round(actualDistance * 1000)}m` : 
+      `${actualDistance.toFixed(1)}km`;
+  }
+
+  let timeDisplay = 'Belirtilmemiş';
+  if (packageData.pickup_start_time && packageData.pickup_end_time) {
+    try {
+      const startTime = new Date(packageData.pickup_start_time).toLocaleTimeString('tr-TR', {
+        hour: '2-digit', 
+        minute: '2-digit'
+      });
+      const endTime = new Date(packageData.pickup_end_time).toLocaleTimeString('tr-TR', {
+        hour: '2-digit', 
+        minute: '2-digit'
+      });
+      timeDisplay = `${startTime}-${endTime}`;
+    } catch (error) {
+      console.warn('Zaman parse hatası:', error);
+    }
+  }
+
+  // ⭐ DÜZELTME: Tüm ID alanlarını integer yapın
+  return {
+    id: packageId,  // ⭐ DEĞIŞTI: Integer olarak kaydet
+    realId: packageId,  // integer ID backend için
+    packageId: packageId, // explicit integer field
+    storeName: packageData.seller?.business_name || 'Mağaza',
+    product: packageData.package_name || 'Paket',
+    oldPrice: parseFloat(packageData.original_price) || 0,
+    newPrice: parseFloat(packageData.discounted_price) || 0,
+    distance,
+    time: timeDisplay,
+    category: 'Restoran',
+    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
+    savedCount: Math.floor(Math.random() * 50) + 1,
+    location: { lat, lng },
+    sellerId: packageData.seller?.user_id,
+    isOwnPackage: packageData.seller?.user_id === currentUserId,
+    actualDistance,
+    isDemo: false,
+    quantityAvailable: packageData.quantity_available || 1
+  };
+};
+
+
+  const validRealPackages = realPackages
+    .map(convertRealPackageToBusinessFormat)
+    .filter(business => {
+      if (business === null) return false;
+      if (business.actualDistance > MAX_DISTANCE_KM) {
+        return false;
+      }
+      return true;
+    });
+
+  // Filtreleme
+  const filteredBusinesses = selectedCategory === 'Tümü'
+    ? validRealPackages.filter(b => {
+        const matchesSearch = b.storeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            b.product?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesSearch;
+      })
+    : validRealPackages.filter(b => {
+        const matchesCategory = b.category === selectedCategory;
+        const matchesSearch = b.storeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            b.product?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+      });
+
+  // Sıralama
+  const sortedBusinesses = [...filteredBusinesses].sort((a, b) => {
+    switch (sortOption) {
+      case 'alphabetical':
+        return a.storeName.localeCompare(b.storeName);
+      case 'price':
+        return a.newPrice - b.newPrice;
+      case 'distance':
+        return a.actualDistance - b.actualDistance;
+      case 'time':
+        return a.time.localeCompare(b.time);
+      default:
+        return 0;
+    }
+  });
 
   const handleProductClick = (product) => {
     setSelectedProduct(product);
@@ -247,48 +547,9 @@ const Home = () => {
     setShowProductDetail(false);
   };
 
-  const filteredBusinesses = selectedCategory === 'Tümü'
-    ? allBusinesses.filter(b =>
-        b.storeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.product.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : allBusinesses.filter(b =>
-        b.category === selectedCategory &&
-        (b.storeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         b.product.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-   const sortedBusinesses = [...filteredBusinesses].sort((a, b) => {
-    switch (sortOption) {
-      case 'alphabetical':
-        return a.storeName.localeCompare(b.storeName);
-      case 'distance':
-        // Extract numeric value from distance string (e.g. "300m" -> 300)
-        const distA = parseInt(a.distance);
-        const distB = parseInt(b.distance);
-        return distA - distB;
-      case 'rating':
-        // Sort by rating, if ratings are equal sort by review count
-        if (b.rating === a.rating) {
-          return b.reviewCount - a.reviewCount;
-        }
-        return b.rating - a.rating;
-      default:
-        return 0;
-    }
-  });
+  // Eski handleBuy fonksiyonunu handleAddToCart ile değiştir
   const handleBuy = (business) => {
-    setCart([...cart, business]);
-    
-    setImpactStats(prev => ({
-      ...prev,
-      savedFood: prev.savedFood + 1,
-      co2Reduced: prev.co2Reduced + 2,
-    }));
-    
-    alert(`${business.storeName} işletmesinden "${business.product}" ürünü sepete eklendi!`);
-    if (showProductDetail) {
-      setShowProductDetail(false);
-    }
+    handleAddToCart(business, 1);
   };
 
   const handleCategoryClick = (category) => {
@@ -324,7 +585,7 @@ const Home = () => {
 
   const declineLocationPermission = () => {
     setShowLocationPermission(false);
-    // Default to a location (Istanbul)
+    localStorage.setItem('locationPermissionShown', 'true');
     setUserLocation({ lat: 41.0082, lng: 28.9784 });
   };
 
@@ -335,37 +596,54 @@ const Home = () => {
     }
   };
 
+  // Sepet toplamını hesapla
+  const getCartTotal = () => {
+    return cart.reduce((total, item) => {
+      return total + (parseFloat(item.unit_price) * item.quantity);
+    }, 0);
+  };
+
+  // İlk yükleme
   useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    setCurrentUserId(user.user_id || user.id);
+    
     if (!localStorage.getItem('onboardingShown')) {
       setShowOnboarding(true);
-    } else {
-      setShowOnboarding(false);
     }
 
     if (!localStorage.getItem('locationPermissionShown')) {
-      setShowLocationPermission(true);
+      setTimeout(() => {
+        setShowLocationPermission(true);
+      }, 1000);
     } else {
       getUserLocation();
     }
 
-    // Load favorites from localStorage
     const savedFavorites = localStorage.getItem('favorites');
     if (savedFavorites) {
       setFavorites(JSON.parse(savedFavorites));
     }
+
+    loadRealPackages();
+    loadCartCount();
   }, []);
 
-  // Save favorites to localStorage
   useEffect(() => {
     localStorage.setItem('favorites', JSON.stringify(favorites));
   }, [favorites]);
 
-  // Load Google Maps when the map view is activated
   useEffect(() => {
     if (showMapView) {
       loadGoogleMapsScript();
     }
   }, [showMapView, userLocation]);
+
+  useEffect(() => {
+    if (showCart) {
+      loadCart();
+    }
+  }, [showCart]);
 
   return (
     <>
@@ -373,7 +651,7 @@ const Home = () => {
         <div className="onboarding-overlay">
           <div className="onboarding-container">
             <div className="onboarding-header">
-              <h2>SofraPay'a Hoş Geldiniz!</h2>
+              <h2>🍽️ SofraPay'a Hoş Geldiniz!</h2>
               <button className="close-button" onClick={closeOnboarding}>
                 <FaTimes />
               </button>
@@ -385,8 +663,8 @@ const Home = () => {
                   <FaSearch />
                 </div>
                 <div className="step-text">
-                  <h3>İsrafı Önle</h3>
-                  <p>Yakınınızdaki işletmelerden uygun fiyata yemek paketleri bulun.</p>
+                  <h3>🌱 İsrafı Önle</h3>
+                  <p>Yakınınızdaki işletmelerden uygun fiyata kaliteli yemek paketleri keşfedin.</p>
                 </div>
               </div>
 
@@ -395,8 +673,8 @@ const Home = () => {
                   <FaShoppingBag />
                 </div>
                 <div className="step-text">
-                  <h3>Satın Al</h3>
-                  <p>Beğendiğiniz paketi satın alın ve belirtilen saatte teslim alın.</p>
+                  <h3>🛒 Satın Al & Kurtar</h3>
+                  <p>Beğendiğiniz paketi ayırın ve belirtilen saatte teslim alın.</p>
                 </div>
               </div>
 
@@ -405,97 +683,178 @@ const Home = () => {
                   <FaHeart />
                 </div>
                 <div className="step-text">
-                  <h3>Çevreye Katkı Sağla</h3>
-                  <p>Her paket ile gıda israfını azaltın ve karbon ayak izinizi düşürün.</p>
+                  <h3>🌍 Çevreye Katkı Sağla</h3>
+                  <p>Her paket ile gıda israfını azaltın ve sürdürülebilir bir gelecek inşa edin.</p>
                 </div>
               </div>
             </div>
 
             <div className="onboarding-footer">
               <button className="start-button" onClick={closeOnboarding}>
-                Hemen Başla
+                🚀 Hemen Başla
               </button>
             </div>
           </div>
         </div>
       )}
-      
 
-
+      {/* Ana Uygulama */}
       <div className="app-container">
+        {/* Mobil Header */}
+        <div className="mobile-header">
+          <div className="header-content">
+            <h1 className="app-title">🍽️ SofraPay</h1>
+            <div className="header-actions">
+
+
+            </div>
+          </div>
+          
+
+        </div>
+
         <div className="content-grid">
           {/* Sol Filtre Bölümü */}
-          <div className="filter-column">
+          <div className={`filter-column ${showMobileFilters ? 'mobile-show' : ''}`}>
             <FilterSidebar 
               onFilterChange={(category) => {
                 setSelectedCategory(category);
-                // Yeni prop yapısı için uyumluluk
-                handleCategoryClick(category);
+                setShowMobileFilters(false);
               }}
               onSortChange={(option) => setSortOption(option)}
+              onClose={() => setShowMobileFilters(false)}
             />
           </div>
           
-          {/* Orta İçerik Bölümü */}
+          {/* Ana İçerik */}
           <div className="main-content-column">
-
-
             {!showMapView ? (
               <div className="product-cards-section">
-                <h2 className="section-title-large">Günün İlanları</h2>
-                <div className="product-cards-container">
-                  {sortedBusinesses.map((business) => (
-                    <div key={business.id} className="product-card" onClick={() => handleProductClick(business)}>
-                      <div className="product-image-container">
-                        <img src={business.image} alt={business.product} className="product-image" />
-                        <div 
-                          className="favorite-button" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(business.id);
-                          }}
-                        >
-                          {isFavorite(business.id) ? <FaHeart color="#FF5A5F" /> : <FaRegHeart />}
-                        </div>
-                        <div className="food-saved-tag">
-                          <FaLeaf /> {business.savedCount} paket kurtarıldı
-                        </div>
-                      </div>
-                      <div className="product-info">
-                        <div className="store-name">{business.storeName}</div>
-                        <div className="product-name">{business.product}</div>
-                        <div className="product-details">
-                          <div className="collection-info">
-                            <div className="pickup-time">
-                              <FaClock /> {business.time}
-                            </div>
-                            <div className="distance">
-                              <FaMapMarkerAlt /> {business.distance}
-                            </div>
-                          </div>
-                          <div className="price-info">
-                            <div className="old-price">₺{business.oldPrice.toFixed(2)}</div>
-                            <div className="new-price">₺{business.newPrice.toFixed(2)}</div>
-                          </div>
-                        </div>
-                        <button 
-                          className="reserve-button" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBuy(business);
-                          }}
-                        >
-                          Paket Ayır
-                        </button>
-                      </div>
+                <div className="section-header">
+                  <div className="header-info">
+                    <h2 className="section-title-large">🔥 Günün Fırsatları</h2>
+                    <p className="section-subtitle">Gıda israfını önle, çevreyi koru!</p>
+                  </div>
+                  
+                  {isLoadingLocation && (
+                    <div className="location-status loading">
+                      <FaMapMarkerAlt /> Konum alınıyor...
                     </div>
+                  )}
+                  
+                  {userLocation && (
+                    <div className="location-status">
+                      <FaMapMarkerAlt /> {MAX_DISTANCE_KM}km içindeki fırsatlar
+                    </div>
+                  )}
+                </div>
+                
+                {/* Kategori Filtreleri */}
+                <div className="categories-container">
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      className={`category-button ${selectedCategory === category ? 'active' : ''}`}
+                      onClick={() => handleCategoryClick(category)}
+                    >
+                      {category}
+                    </button>
                   ))}
                 </div>
+                
+                {isLoadingPackages ? (
+                  <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <p>Harika fırsatlar yükleniyor...</p>
+                  </div>
+                ) : (
+                  <div className="product-cards-container">
+                    {sortedBusinesses.length === 0 ? (
+                      <div className="no-packages-message">
+                        <div className="empty-state">
+                          <FaMapMarkerAlt />
+                          <h3>🔍 Yakınınızda fırsat bulunamadı</h3>
+                          <p>Şu anda {MAX_DISTANCE_KM}km içinde aktif paket bulunmuyor.</p>
+                          <p>Daha sonra tekrar kontrol edin veya arama kriterlerinizi değiştirin.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      sortedBusinesses.map((business) => (
+                        <div 
+                          key={business.id} 
+                          className="product-card" 
+                          onClick={() => handleProductClick(business)}
+                          
+                        >
+                          <div className="product-image-container">
+                            <img 
+                              src={business.image} 
+                              alt={business.product} 
+                              className="product-image" 
+                            />
+                            <div 
+                              className="favorite-button" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(business.id);
+                              }}
+                            >
+                              {isFavorite(business.id) ? 
+                                <FaHeart className="favorited" /> : 
+                                <FaRegHeart />
+                              }
+                            </div>
+                            <div className="food-saved-tag">
+                              <FaLeaf /> {business.savedCount} kurtarıldı
+                            </div>
+                            {business.isOwnPackage && (
+                              <div className="own-package-badge">
+                                Kendi Paketiniz
+                              </div>
+                            )}
+                            <div className="discount-badge">
+                              {Math.round((1 - business.newPrice / business.oldPrice) * 100)}% İndirim
+                            </div>
+                          </div>
+                          
+                          <div className="product-info">
+                            <div className="store-name">{business.storeName}</div>
+                            <div className="product-name">{business.product}</div>
+                            
+                            <div className="product-details">
+                              <div className="collection-info">
+                                <div className="pickup-time">
+                                  <FaClock /> {business.time}
+                                </div>
+                                <div className="distance">
+                                  <FaMapMarkerAlt /> {business.distance}
+                                </div>
+                              </div>
+                              
+                              <div className="price-info">
+                                <div className="old-price">₺{business.oldPrice.toFixed(2)}</div>
+                                <div className="new-price">₺{business.newPrice.toFixed(2)}</div>
+                              </div>
+                            </div>
+                            
+                            <button 
+                              className={`reserve-button ${business.isOwnPackage ? 'own-package' : ''}`}
+                              onClick={() => addToCart(business)}
+                              disabled={business.isOwnPackage}
+                            >
+                              {business.isOwnPackage ? '🚫 Kendi Paketiniz' : '🛒 Ürünü Kurtar'}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="map-view-container">
                 <div className="map-header">
-                  <h2>Yakındaki İşletmeler</h2>
+                  <h2>🗺️ Yakındaki Fırsatlar</h2>
                   <button className="close-map-button" onClick={() => setShowMapView(false)}>
                     <FaTimes />
                   </button>
@@ -505,35 +864,57 @@ const Home = () => {
             )}
           </div>
           
-          {/* Sağ Bağış Bölümü */}
-
+          {/* Sağ Impact Stats */}
+          <div className="stats-column">
+            <div className="impact-stats-container">
+              <div className="impact-title">🌍 Toplam Etki</div>
+              <div className="stats-grid">
+                <div className="stat-item">
+                  <div className="stat-value">{impactStats.savedFood}</div>
+                  <div className="stat-label">Kurtarılan Yemek</div>
+                </div>
+                <div className="stat-item">
+                  <div className="stat-value">{impactStats.co2Reduced}kg</div>
+                  <div className="stat-label">Azaltılan CO₂</div>
+                </div>
+                <div className="stat-item">
+                  <div className="stat-value">{impactStats.userCount}</div>
+                  <div className="stat-label">Aktif Kullanıcı</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Floating Harita Butonu */}
       <button className="floating-map-button" onClick={handleMapButtonClick}>
         <FaMap />
-        <span>{showMapView ? "Listeyi Göster" : "Haritayı Göster"}</span>
+        <span>{showMapView ? "📋 Listeyi Göster" : "🗺️ Haritayı Göster"}</span>
       </button>
 
+      {/* Konum İzni */}
       {showLocationPermission && (
-        <div className="location-permission-prompt">
-          <div className="permission-content">
-            <FaMapMarkerAlt />
-            <div className="permission-text">
-              <h3>Konumunuzu paylaşın</h3>
-              <p>Yakınınızdaki teklifleri görmek için konumunuza erişmemize izin verin.</p>
+        <div className="location-permission-overlay">
+          <div className="permission-container">
+            <div className="permission-icon">
+              <FaMapMarkerAlt />
             </div>
-            <div className="permission-actions">
-              <button className="allow-button" onClick={allowLocationPermission}>
-                İzin Ver
-              </button>
-              <button className="later-button" onClick={declineLocationPermission}>
-                Daha Sonra
-              </button>
+            <div className="permission-content">
+              <h3>📍 Konumunuzu Paylaşın</h3>
+              <p>Yakınınızdaki en iyi fırsatları görebilmek için konumunuza erişmemize izin verin.</p>
+              <div className="permission-actions">
+                <button className="allow-button" onClick={allowLocationPermission}>
+                  ✅ İzin Ver
+                </button>
+                <button className="later-button" onClick={declineLocationPermission}>
+                  ⏰ Daha Sonra
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-      
       {/* Product Detail Popup */}
       {showProductDetail && selectedProduct && (
         <div className="product-detail-overlay" onClick={closeProductDetail}>
@@ -555,6 +936,11 @@ const Home = () => {
                 >
                   {isFavorite(selectedProduct.id) ? <FaHeart color="#FF5A5F" /> : <FaRegHeart />}
                 </div>
+                {selectedProduct.isOwnPackage && (
+                  <div className="detail-own-package-badge">
+                    Kendi Paketiniz
+                  </div>
+                )}
               </div>
               
               <div className="product-detail-info">
@@ -564,7 +950,7 @@ const Home = () => {
                 <h2 className="detail-product-name">{selectedProduct.product}</h2>
                 
                 <div className="detail-category">
-                  Kategori: {selectedProduct.category}
+                  📂 Kategori: {selectedProduct.category}
                 </div>
                 
                 <div className="detail-collection-info">
@@ -615,15 +1001,18 @@ const Home = () => {
                 
                 <button 
                   className="detail-reserve-button" 
-                  onClick={() => handleBuy(selectedProduct)}
+                  onClick={() => addToCart(selectedProduct)}
+
                 >
-                  Paket Ayır
+                  Ürünü Kurtar
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+ 
     </>
   );
 };

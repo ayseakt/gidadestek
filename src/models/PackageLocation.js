@@ -32,6 +32,15 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
+    // ⭐ BURADAKİ EKLENTİLER: district ve city sütunları
+    district: {
+      type: DataTypes.STRING(255), // String veri tipi ve maksimum uzunluk
+      allowNull: true // Bu alanın boş bırakılıp bırakılamayacağını belirler
+    },
+    city: {
+      type: DataTypes.STRING(255), // String veri tipi ve maksimum uzunluk
+      allowNull: true // Bu alanın boş bırakılıp bırakılamayacağını belirler
+    },
     saved_location_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -56,15 +65,12 @@ module.exports = (sequelize, DataTypes) => {
     collate: 'utf8mb4_turkish_ci'
   });
 
-  // ⭐ ÖNEMLİ: Model ilişkilerini tanımla
   PackageLocation.associate = function(models) {
-    // FoodPackage ile one-to-one ilişki
     PackageLocation.belongsTo(models.FoodPackage, {
       foreignKey: 'package_id',
       as: 'package'
     });
 
-    // Eğer SavedLocation modeli varsa
     if (models.SavedLocation) {
       PackageLocation.belongsTo(models.SavedLocation, {
         foreignKey: 'saved_location_id',

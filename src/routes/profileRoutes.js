@@ -59,5 +59,8 @@ router.post('/change-password', profileController.changePassword);
 
 // Profil resmi yükle
 router.post('/upload-picture', upload.single('profilePicture'), profileController.uploadProfilePicture);
+// Satıcı profili rotalarını ekleyin
+router.get('/seller', profileController.getSellerProfile);
+router.put('/seller/update', profileController.updateSellerProfile);
 
 module.exports = router;

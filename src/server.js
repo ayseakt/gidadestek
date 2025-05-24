@@ -12,9 +12,10 @@ const upload = multer();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ✅ CORS ayarlarını genişletilmiş hali - PATCH metodunu da ekliyoruz
 app.use(cors({
   origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // ✅ PATCH eklendi
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
@@ -30,11 +31,12 @@ const profileRoutes = require('./routes/profileRoutes');
 const packageRoutes = require('./routes/packageRoutes');
 const statisticsRoutes = require('./routes/statisticsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const cartRoutes = require('./routes/cartRoutes'); // 🔴 EKSİK OLAN ROUTE!
 
 // Sadece JSON endpointleri için body parser kullan
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
-// ... diğer JSON endpointleri ...
+app.use('/api/cart', cartRoutes); // 🔴 EKSİK OLAN ROUTE TANIMI!
 
 // FormData ile çalışan endpointler için body parser KULLANMA!
 app.use('/api/packages', packageRoutes);
@@ -65,6 +67,7 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server ${PORT} portunda çalışıyor`);
       console.log(`📌 CORS: http://localhost:3000 için etkinleştirildi`);
+      console.log(`📌 Desteklenen HTTP metodları: GET, POST, PUT, DELETE, PATCH, OPTIONS`);
     });
   } catch (error) {
     console.error('❌ Server başlatma hatası:', error);

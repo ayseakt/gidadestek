@@ -1,17 +1,15 @@
-// profileController.js
-const { User, UserProfile } = require('../models');
+const { User, UserProfile, Seller } = require('../models');
 const bcrypt = require('bcrypt');
 
 // Kullanıcı profil bilgilerini getir
-exports.getProfile = async (req, res) => {
+const getProfile = async (req, res) => {
   try {
-    const userId = req.user.id; // JWT middleware'den gelen kullanıcı ID'si
+    const userId = req.user.id;
 
-    // Kullanıcı ve profil bilgilerini birlikte sorgula
     const user = await User.findOne({
       where: { user_id: userId },
       include: [{ model: UserProfile }],
-      attributes: { exclude: ['password_hash'] } // Şifreyi hariç tut
+      attributes: { exclude: ['password_hash'] }
     });
 
     if (!user) {
@@ -20,19 +18,20 @@ exports.getProfile = async (req, res) => {
         message: 'Kullanıcı bulunamadı'
       });
     }
-
-    // Yanıt formatını oluştur
+    const userProfile = user.UserProfile;
+    const firstName = userProfile?.first_name || '';
+    const lastName = userProfile?.last_name || '';
     const response = {
       success: true,
       user: {
         id: user.user_id,
         email: user.email,
         phone: user.phone_number,
-        name: `${user.UserProfile.first_name} ${user.UserProfile.last_name}`.trim(),
-        first_name: user.UserProfile.first_name,
-        last_name: user.UserProfile.last_name,
-        profile_picture: user.UserProfile.profile_picture,
-        bio: user.UserProfile.bio
+        name:`${firstName} ${lastName}`.trim() || 'Kullanıcı',
+        first_name:  firstName,
+        last_name: lastName,
+        profile_picture: userProfile?.profile_picture || null,
+        bio: userProfile?.bio || ''
       }
     };
 
@@ -48,17 +47,16 @@ exports.getProfile = async (req, res) => {
 };
 
 // Profil bilgilerini güncelle
-exports.updateProfile = async (req, res) => {
+const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { firstName, lastName, email, phone, bio } = req.body;
 
-    // Eğer email değişiyorsa, başka bir kullanıcıda var mı kontrol et
     if (email) {
       const existingUser = await User.findOne({
         where: { email, user_id: { [User.sequelize.Op.ne]: userId } }
       });
-      
+
       if (existingUser) {
         return res.status(400).json({
           success: false,
@@ -67,12 +65,11 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    // Eğer telefon değişiyorsa, başka bir kullanıcıda var mı kontrol et
     if (phone) {
       const existingPhoneUser = await User.findOne({
         where: { phone_number: phone, user_id: { [User.sequelize.Op.ne]: userId } }
       });
-      
+
       if (existingPhoneUser) {
         return res.status(400).json({
           success: false,
@@ -81,46 +78,62 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    // Transaction başlat
     await User.sequelize.transaction(async (t) => {
-      // Kullanıcı bilgilerini güncelle
       if (email || phone) {
         await User.update(
-          { 
+          {
             ...(email && { email }),
             ...(phone && { phone_number: phone })
           },
-          { 
+          {
             where: { user_id: userId },
             transaction: t
           }
         );
       }
 
-      // Profil bilgilerini güncelle
-      if (firstName || lastName || bio) {
-        await UserProfile.update(
-          {
-            ...(firstName && { first_name: firstName }),
-            ...(lastName && { last_name: lastName }),
-            ...(bio && { bio }),
+      if (firstName || lastName || bio !== undefined) {
+        // Önce UserProfile var mı kontrol edelim
+        let userProfile = await UserProfile.findOne({
+          where: { user_id: userId },
+          transaction: t
+        });
+
+        if (!userProfile) {
+          // UserProfile yoksa oluştur
+          await UserProfile.create({
+            user_id: userId,
+            first_name: firstName || '',
+            last_name: lastName || '',
+            bio: bio || '',
+            created_at: new Date(),
             updated_at: new Date()
-          },
-          {
-            where: { user_id: userId },
-            transaction: t
-          }
-        );
+          }, { transaction: t });
+        } else {
+          // UserProfile varsa güncelle
+          await UserProfile.update(
+            {
+              ...(firstName !== undefined && { first_name: firstName }),
+              ...(lastName !== undefined && { last_name: lastName }),
+              ...(bio !== undefined && { bio }),
+              updated_at: new Date()
+            },
+            {
+              where: { user_id: userId },
+              transaction: t
+            }
+          );
+        }
       }
     });
 
-    // Güncellenmiş kullanıcı bilgilerini getir
     const updatedUser = await User.findOne({
       where: { user_id: userId },
       include: [{ model: UserProfile }],
       attributes: { exclude: ['password_hash'] }
     });
-
+    const userProfile = updatedUser.UserProfile;
+    
     res.status(200).json({
       success: true,
       message: 'Profil bilgileri başarıyla güncellendi',
@@ -128,11 +141,11 @@ exports.updateProfile = async (req, res) => {
         id: updatedUser.user_id,
         email: updatedUser.email,
         phone: updatedUser.phone_number,
-        name: `${updatedUser.UserProfile.first_name} ${updatedUser.UserProfile.last_name}`.trim(),
-        first_name: updatedUser.UserProfile.first_name,
-        last_name: updatedUser.UserProfile.last_name,
-        profile_picture: updatedUser.UserProfile.profile_picture,
-        bio: updatedUser.UserProfile.bio
+        name: `${firstName} ${lastName}`.trim() || 'Kullanıcı',
+        first_name: firstName,
+        last_name:lastName,
+        profile_picture:userProfile?.profile_picture || null,
+        bio: userProfile?.bio || ''
       }
     });
   } catch (error) {
@@ -146,12 +159,11 @@ exports.updateProfile = async (req, res) => {
 };
 
 // Şifre değiştirme
-exports.changePassword = async (req, res) => {
+const changePassword = async (req, res) => {
   try {
     const userId = req.user.id;
     const { currentPassword, newPassword } = req.body;
 
-    // Kullanıcıyı bul
     const user = await User.findOne({ where: { user_id: userId } });
     if (!user) {
       return res.status(404).json({
@@ -160,7 +172,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Mevcut şifreyi kontrol et
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -169,11 +180,9 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Yeni şifreyi hashle
     const salt = await bcrypt.genSalt(10);
     const hashedNewPassword = await bcrypt.hash(newPassword, salt);
 
-    // Şifreyi güncelle
     await User.update(
       { password_hash: hashedNewPassword },
       { where: { user_id: userId } }
@@ -194,29 +203,42 @@ exports.changePassword = async (req, res) => {
 };
 
 // Profil resmi yükleme
-exports.uploadProfilePicture = async (req, res) => {
+const uploadProfilePicture = async (req, res) => {
   try {
     const userId = req.user.id;
-    
-    // req.file middleware tarafından yüklenir (multer kullanılmalı)
+
     if (!req.file) {
       return res.status(400).json({
-        success: false, 
+        success: false,
         message: 'Dosya yüklenemedi'
       });
     }
 
-    // Profil resminin dosya yolunu veritabanına kaydet
-    // Bu örnekte dosya adını kullanıyoruz, gerçek uygulamada tam URL veya yol olabilir
     const profilePicturePath = `/uploads/profile/${req.file.filename}`;
-    
-    await UserProfile.update(
-      { 
+
+    // UserProfile var mı kontrol et, yoksa oluştur
+    let userProfile = await UserProfile.findOne({
+      where: { user_id: userId }
+    });
+
+    if (!userProfile) {
+      await UserProfile.create({
+        user_id: userId,
+        first_name: '',
+        last_name: '',
         profile_picture: profilePicturePath,
+        created_at: new Date(),
         updated_at: new Date()
-      },
-      { where: { user_id: userId } }
-    );
+      });
+    } else {
+      await UserProfile.update(
+        {
+          profile_picture: profilePicturePath,
+          updated_at: new Date()
+        },
+        { where: { user_id: userId } }
+      );
+    }
 
     res.status(200).json({
       success: true,
@@ -231,4 +253,115 @@ exports.uploadProfilePicture = async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : 'Sunucu hatası'
     });
   }
+};
+
+// Satıcı profili getir
+const getSellerProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const seller = await Seller.findOne({
+      where: { user_id: userId },
+      include: [{
+        model: User,
+        attributes: ['email', 'phone_number']
+      }]
+    });
+
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Satıcı profili bulunamadı'
+      });
+    }
+
+    res.json({
+      success: true,
+      
+      data: {
+        seller_id: seller.seller_id,
+        business_name: seller.business_name || '',
+        business_type: seller.business_type || '',
+        business_description: seller.business_description || '',
+        rating: seller.rating || 0,
+        total_ratings: seller.total_ratings || 0,
+        is_verified: seller.is_verified || false,
+        email: seller.User?.email || '',
+        phone_number: seller.User?.phone_number || '',
+        // Profil tamamlanma durumu
+        isProfileComplete: !!(seller.business_name && seller.business_type && seller.business_description)
+      }
+    });
+  } catch (error) {
+    console.error('Satıcı profili getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası'
+    });
+  }
+};
+
+// Satıcı profili güncelle
+const updateSellerProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { business_name, business_type, business_description } = req.body;
+
+    // Seller kaydı var mı kontrol et
+    let seller = await Seller.findOne({
+      where: { user_id: userId }
+    });
+
+    if (!seller) {
+      // Seller kaydı yoksa oluştur
+      seller = await Seller.create({
+        user_id: userId,
+        business_name: business_name || '',
+        business_type: business_type || 'other',
+        business_description: business_description || '',
+        is_verified: false,
+        rating: null,
+        total_ratings: 0,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+    } else {
+      // Seller kaydı varsa güncelle
+      await seller.update({
+        business_name: business_name || seller.business_name,
+        business_type: business_type || seller.business_type,
+        business_description: business_description || seller.business_description,
+        updated_at: new Date()
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Satıcı profili başarıyla güncellendi',
+      data: {
+        seller_id: seller.seller_id,
+        business_name: seller.business_name,
+        business_type: seller.business_type,
+        business_description: seller.business_description,
+        isProfileComplete: !!(seller.business_name && seller.business_type && seller.business_description)
+      }
+    });
+  } catch (error) {
+    console.error('Satıcı profili güncelleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası'
+    });
+  }
+};
+
+// === Dışa aktarım ===
+module.exports = {
+  getProfile,
+  updateProfile,
+  changePassword,
+  uploadProfilePicture,
+  getSellerProfile,
+  updateSellerProfile
 };
