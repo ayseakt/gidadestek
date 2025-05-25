@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { FaTimes, FaSearch, FaPlus, FaMinus, FaMapMarkerAlt } from 'react-icons/fa';
 import './AddressButton.css';
 import { useAuth } from '../context/authContext';
@@ -28,14 +28,25 @@ const AddressButton = () => {
     return null;
   };
 
-  const finalUserId = getUserId();
+ const finalUserId = useMemo(() => {
+  if (user?.id) return user.id;
+  if (user?.user_id) return user.user_id;
+  if (user?.userId) return user.userId;
+  
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      return parsed.id || parsed.user_id || parsed.userId;
+    }
+  } catch (error) {
+    console.error('LocalStorage user parse hatası:', error);
+  }
+  
+  return null;
+}, [user]);
 
-  // Debug için
-  useEffect(() => {
-    console.log('AddressButton - Auth Context user:', user);
-    console.log('AddressButton - Final userId:', finalUserId);
-    console.log('AddressButton - localStorage user:', localStorage.getItem('user'));
-  }, [user, finalUserId]);
+
 
   const [selectedAddressName, setSelectedAddressName] = useState('');
   const [showAddressPanel, setShowAddressPanel] = useState(false);
@@ -57,75 +68,73 @@ const AddressButton = () => {
 
   // API endpoint'i
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5051/api';
-  
-  // Auth header'ı al
-  const getAuthHeader = () => {
+// Bu kodu değiştirin:
+  const getAuthHeader = useCallback(() => {
     const token = localStorage.getItem('token') || localStorage.getItem('authToken');
     console.log('Token kontrolü:', token ? 'Token mevcut' : 'Token bulunamadı');
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
-  };
+  }, []);
 
   // Kayıtlı adresleri veritabanından yükle
-  const loadSavedAddresses = async () => {
-    if (!finalUserId) {
-      console.warn('loadSavedAddresses - userId yok:', finalUserId);
-      return;
-    }
+// Bu kodu değiştirin:
+const loadSavedAddresses = useCallback(async () => {
+  if (!finalUserId) {
+    console.warn('loadSavedAddresses - userId yok:', finalUserId);
+    return;
+  }
+  
+  try {
+    setLoading(true);
+    console.log('Adresler yükleniyor, userId:', finalUserId);
     
-    try {
-      setLoading(true);
-      console.log('Adresler yükleniyor, userId:', finalUserId);
-      
-      const response = await fetch(`${API_URL}/locations`, {
-        method: 'GET',
-        headers: getAuthHeader()
-      });
+    const response = await fetch(`${API_URL}/locations`, {
+      method: 'GET',
+      headers: getAuthHeader()
+    });
 
-      console.log('Adres yükleme response status:', response.status);
+    console.log('Adres yükleme response status:', response.status);
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Yüklenen adres verisi:', data);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Yüklenen adres verisi:', data);
+      if (data.success && data.data) {
+        const formattedAddresses = data.data.map(addr => ({
+          id: addr.location_id,
+          name: addr.location_name,
+          address: addr.address,
+          lat: parseFloat(addr.latitude) || 0,
+          lng: parseFloat(addr.longitude) || 0,
+          city: addr.city,
+          district: addr.district,
+          isDefault: addr.is_default
+        }));
         
-        if (data.success && data.data) {
-          // Backend'den gelen veriyi frontend formatına çevir
-          const formattedAddresses = data.data.map(addr => ({
-            id: addr.location_id,
-            name: addr.location_name,
-            address: addr.address,
-            lat: parseFloat(addr.latitude) || 0,
-            lng: parseFloat(addr.longitude) || 0,
-            city: addr.city,
-            district: addr.district,
-            isDefault: addr.is_default
-          }));
-          
-          console.log('Formatlanmış adresler:', formattedAddresses);
-          setSavedAddresses(formattedAddresses);
-          
-          // Varsayılan adresi seç
-          const defaultAddress = formattedAddresses.find(addr => addr.isDefault);
-          if (defaultAddress && !selectedAddress) {
-            setSelectedAddress(defaultAddress.address);
-            setSelectedAddressName(defaultAddress.name);
-            localStorage.setItem('selectedAddress', defaultAddress.address);
-            localStorage.setItem('selectedAddressId', defaultAddress.id.toString());
-            console.log('Varsayılan adres seçildi:', defaultAddress);
-          }
+        console.log('Formatlanmış adresler:', formattedAddresses);
+        setSavedAddresses(formattedAddresses);
+        
+        const defaultAddress = formattedAddresses.find(addr => addr.isDefault);
+        if (defaultAddress && !selectedAddress) {
+          setSelectedAddress(defaultAddress.address);
+          setSelectedAddressName(defaultAddress.name);
+          localStorage.setItem('selectedAddress', defaultAddress.address);
+          localStorage.setItem('selectedAddressId', defaultAddress.id.toString());
+          console.log('Varsayılan adres seçildi:', defaultAddress);
         }
-      } else {
-        const errorData = await response.json();
-        console.error('Adresler yüklenemedi:', response.status, errorData);
       }
-    } catch (error) {
-      console.error('Adres yükleme hatası:', error);
-    } finally {
-      setLoading(false);
+    } else {
+      const errorData = await response.json();
+      console.error('Adresler yüklenemedi:', response.status, errorData);
     }
-  };
+  } catch (error) {
+    console.error('Adres yükleme hatası:', error);
+  } finally {
+    setLoading(false);
+  }
+}, [finalUserId, selectedAddress, API_URL]); // Bağımlılıkları ekleyin
 
   // Yeni adres kaydet
   const saveAddressToDatabase = async (addressData) => {

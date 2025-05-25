@@ -129,7 +129,8 @@ const checkoutController = {
         data: {
           order: orderWithDetails,
           orderNumber: orderNumber
-        }
+        },
+        redirectUrl: '/orders'
       });
 
     } catch (error) {

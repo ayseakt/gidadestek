@@ -2,9 +2,9 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const path = require('path');
-const multer = require('multer'); // multer require edilmeli
+const multer = require('multer');
 require('dotenv').config();
-const { sequelize } = require('./models'); // Burada models'ten sadece sequelize almalısınız
+const { sequelize } = require('./models');
 
 // Multer middleware
 const upload = multer();
@@ -19,6 +19,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
 app.options('*', cors());
 
 // Statik dosyalar
@@ -31,16 +32,17 @@ const profileRoutes = require('./routes/profileRoutes');
 const packageRoutes = require('./routes/packageRoutes');
 const statisticsRoutes = require('./routes/statisticsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
-const cartRoutes = require('./routes/cartRoutes'); // 🔴 EKSİK OLAN ROUTE!
+const cartRoutes = require('./routes/cartRoutes');
+const orderRoutes = require('./routes/orderRoutes'); // ✅ Sipariş route'ları eklendi
 
 // Sadece JSON endpointleri için body parser kullan
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
-app.use('/api/cart', cartRoutes); // 🔴 EKSİK OLAN ROUTE TANIMI!
+app.use('/api/cart', cartRoutes);
+app.use('/api/orders', orderRoutes); // ✅ Sipariş endpoint'leri eklendi
 
 // FormData ile çalışan endpointler için body parser KULLANMA!
 app.use('/api/packages', packageRoutes);
-
 app.use('/api/locations', locationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -60,17 +62,21 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5051;
+
 const startServer = async () => {
   try {
     await sequelize.sync({ force: false });
     console.log('✅ Database tabloları senkronize edildi');
+    
     app.listen(PORT, () => {
       console.log(`🚀 Server ${PORT} portunda çalışıyor`);
       console.log(`📌 CORS: http://localhost:3000 için etkinleştirildi`);
       console.log(`📌 Desteklenen HTTP metodları: GET, POST, PUT, DELETE, PATCH, OPTIONS`);
+      console.log(`📌 Sipariş API endpoint'leri aktif: /api/orders`);
     });
   } catch (error) {
     console.error('❌ Server başlatma hatası:', error);
   }
 };
+
 startServer();

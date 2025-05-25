@@ -327,7 +327,7 @@ function TrendyolStyleMyOrders() {
                 
                 <div className="detail-row">
                   <FaCalendarAlt />
-                  <div>
+                  <div>gidadestek
                     <strong>Sipariş Tarihi:</strong>
                     <p>{formatDate(selectedOrder.orderDate)}</p>
                   </div>

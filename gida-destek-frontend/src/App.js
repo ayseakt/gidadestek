@@ -7,6 +7,7 @@ import MyOrders from './Components/MyOrders';
 import UserProfile from './Components/UserProfile';
 import Favorites from './Components/Favorites';
 import WelcomeScreen from './Components/WelcomeScreen';
+import PaymentPage from './Components/PaymentPage';
 import { CartProvider } from './contexts/cartContext';
 import { AuthProvider } from './context/authContext'; // ✅ EKLENDİ
 import './App.css';
@@ -22,7 +23,7 @@ const MainScreen = ({ userData, onLogout }) => {
           <Route path="/aldiklarim" element={<MyOrders />} />
           <Route path="/profil" element={<UserProfile userData={userData} />} />
           <Route path="/favoriler" element={<Favorites />} />
-          <Route path="/odeme" element={<div>Ödeme Sayfası (Henüz eklenmedi)</div>} />
+          <Route path="/odeme" element={<PaymentPage />} /> 
           <Route path="/giris" element={<Navigate to="/" replace />} />
           <Route path="/seller-profile" element={<SellerProfile />} />
         </Routes>
