@@ -326,29 +326,7 @@ useEffect(() => {
 
 
 
-  // Favori işlemlerinin yönetilmesi
-  const [favorites, setFavorites] = useState([]);
 
-  useEffect(() => {
-    // LocalStorage'dan favorileri yükle
-    const savedFavorites = localStorage.getItem('favorites');
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
-    }
-  }, []);
-
-  // Favorileri localStorage'a kaydet
-  useEffect(() => {
-    localStorage.setItem('favorites', JSON.stringify(favorites));
-  }, [favorites]);
-
-  const addToFavorites = (item) => {
-    setFavorites([...favorites, item]);
-  };
-
-  const removeFromFavorites = (id) => {
-    setFavorites(favorites.filter(item => item.id !== id));
-  };
 
   // Kendi tanımladığımız onLogout fonksiyonunu kaldırıp, prop olarak gelen fonksiyonu kullanıyoruz
   const handleLogout = () => {
@@ -484,13 +462,13 @@ useEffect(() => {
                   {!isDonorMode ? (
                     <>
                       <li onClick={() => navigate('/profil')}>Profil</li>
-                      <li onClick={() => navigate('/favoriler')}>Favoriler</li>
+                      
                       <li onClick={() => navigate('/aldiklarim')}>Siparişlerim</li>
                       <li onClick={() => navigate('/kayitlikartlar')}>Kayıtlı Kartlarım</li>
                     </>
                   ) : (
                     <>
-                      <li onClick={() => navigate('/profil')}>Profil</li>
+                      <li onClick={() => navigate('/seller-profile')}>Profil</li>
                       <li onClick={() => navigate('/paketlerim')}>Paketlerim</li>
                       <li onClick={() => navigate('/kazanclarim')}>Kazançlarım</li>
                       <li onClick={() => navigate('/degerlerim')}>Değerlendirmelerim</li>

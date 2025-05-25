@@ -1,11 +1,38 @@
 const {
   FoodPackage,
   PackageLocation,
-  Seller
+  Seller,
+  // Category modeli index.js'de yüklü değil, kontrol et
 } = require('../models');
+
+// Eğer Category modeli yoksa, models'dan dinamik olarak al
+const models = require('../models');
+const Category = models.Category || models.PackageCategory; // Her iki ismi de dene
 
 const multer = require('multer');
 const upload = multer();
+
+const packageIncludesWithCategory = [
+  {
+    model: Seller,
+    as: 'seller',
+    attributes: ['seller_id', 'user_id', 'business_name']
+  },
+  {
+    model: PackageLocation, 
+    as: 'location',
+    required: false
+  }
+];
+
+// Category modeli varsa include'a ekle
+if (Category) {
+  packageIncludesWithCategory.push({
+    model: Category,
+    as: 'category',
+    required: false
+  });
+}
 
 const createPackage = async (req, res) => {
   console.log('req.body:', req.body);
@@ -91,7 +118,7 @@ const createPackage = async (req, res) => {
       category_id: category_id || null,
       available_from: startDate,
       available_until: endDate,
-      is_active: 1 // ⭐ Yeni paketler aktif olarak oluşturulur
+      is_active: 1
     };
 
     console.log('Oluşturulacak paket verisi:', packageData);
@@ -160,7 +187,6 @@ const getPackageById = async (req, res) => {
   }
 };
 
-// ⭐ GÜNCELLEME: Sadece aktif paketleri getir
 const getActivePackages = async (req, res) => {
   try {
     const user_id = req.user?.user_id || req.user?.id;
@@ -176,7 +202,7 @@ const getActivePackages = async (req, res) => {
     const packages = await FoodPackage.findAll({
       where: { 
         seller_id: seller.seller_id,
-        is_active: 1 // ⭐ Sadece aktif paketler
+        is_active: 1
       },
       include: [{
         model: PackageLocation,
@@ -194,7 +220,35 @@ const getActivePackages = async (req, res) => {
   }
 };
 
-// ⭐ GÜNCELLEME: Geçmişe sadece iptal edilenler dahil
+// Kategori ile aktif paketler
+const getActivePackagesWithCategories = async (req, res) => {
+  try {
+    const user_id = req.user?.user_id || req.user?.id;
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    const seller = await Seller.findOne({ where: { user_id } });
+    if (!seller) {
+      return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
+    }
+
+    const packages = await FoodPackage.findAll({
+      where: { 
+        seller_id: seller.seller_id,
+        is_active: 1
+      },
+      include: packageIncludesWithCategory,
+      order: [['created_at', 'DESC']]
+    });
+    
+    res.status(200).json({ success: true, data: packages });
+  } catch (error) {
+    console.error('Kategori ile aktif paketler alınırken hata:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
+  }
+};
+
 const getPackageHistory = async (req, res) => {
   try {
     const user_id = req.user?.user_id || req.user?.id;
@@ -210,14 +264,14 @@ const getPackageHistory = async (req, res) => {
     const packages = await FoodPackage.findAll({
       where: { 
         seller_id: seller.seller_id,
-        is_active: 0 // ⭐ Sadece iptal edilmiş paketler (is_active = 0)
+        is_active: 0
       },
       include: [{
         model: PackageLocation,
         as: 'location',
         required: false
       }],
-      order: [['updated_at', 'DESC']] // ⭐ İptal tarihine göre sırala
+      order: [['updated_at', 'DESC']]
     });
 
     console.log('Geçmiş paketler (iptal edilenler):', packages.length);
@@ -228,7 +282,6 @@ const getPackageHistory = async (req, res) => {
   }
 };
 
-// ⭐ GÜNCELLEME: Tüm paketleri getir (aktif + iptal edilenler)
 const getMyPackages = async (req, res) => {
   try {
     console.log('getMyPackages fonksiyonu çağırıldı');
@@ -247,7 +300,6 @@ const getMyPackages = async (req, res) => {
 
     console.log('User ID:', user_id);
 
-    // Seller kontrolü
     const seller = await Seller.findOne({ where: { user_id } });
     
     if (!seller) {
@@ -261,13 +313,12 @@ const getMyPackages = async (req, res) => {
 
     console.log('Seller bulundu:', seller.seller_id);
 
-    // ⭐ GÜNCELLEME: Aktif paketleri getir (sadece is_active = 1 olanlar)
     let packages;
     try {
       packages = await FoodPackage.findAll({
         where: { 
           seller_id: seller.seller_id,
-          is_active: 1 // ⭐ Sadece aktif paketler
+          is_active: 1
         },
         include: [{
           model: PackageLocation,
@@ -281,7 +332,6 @@ const getMyPackages = async (req, res) => {
     } catch (includeError) {
       console.warn('Location include başarısız, temel paketler döndürülüyor:', includeError.message);
       
-      // Include başarısız olsa bile temel paketleri döndür
       packages = await FoodPackage.findAll({
         where: { 
           seller_id: seller.seller_id,
@@ -312,7 +362,6 @@ const getMyPackages = async (req, res) => {
   }
 };
 
-// ⭐ GÜNCELLEME: Paket silmek yerine is_active = 0 yap
 const cancelPackage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -327,12 +376,11 @@ const cancelPackage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
     }
 
-    // Paketi bul ve kontrol et
     const package = await FoodPackage.findOne({
       where: { 
         package_id: id,
         seller_id: seller.seller_id,
-        is_active: 1 // ⭐ Sadece aktif paketler iptal edilebilir
+        is_active: 1
       }
     });
 
@@ -343,7 +391,6 @@ const cancelPackage = async (req, res) => {
       });
     }
 
-    // ⭐ GÜNCELLEME: Paketi silmek yerine is_active = 0 yap
     await package.update({
       is_active: 0,
       cancellation_reason: req.body.cancellation_reason || "Satıcı tarafından iptal edildi",
@@ -366,7 +413,6 @@ const cancelPackage = async (req, res) => {
   }
 };
 
-// ⭐ GÜNCELLEME: Sadece aktif paketler güncellenebilir
 const updatePackage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -381,12 +427,11 @@ const updatePackage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
     }
 
-    // Paketi bul ve kontrol et
     const package = await FoodPackage.findOne({
       where: { 
         package_id: id,
         seller_id: seller.seller_id,
-        is_active: 1 // ⭐ Sadece aktif paketler güncellenebilir
+        is_active: 1
       }
     });
 
@@ -397,7 +442,6 @@ const updatePackage = async (req, res) => {
       });
     }
 
-    // Güncelleme verilerini al
     const {
       package_name,
       original_price,
@@ -411,7 +455,6 @@ const updatePackage = async (req, res) => {
       available_until
     } = req.body;
 
-    // Paketi güncelle
     await package.update({
       package_name: package_name || package.package_name,
       original_price: parseFloat(original_price) || package.original_price,
@@ -428,7 +471,6 @@ const updatePackage = async (req, res) => {
 
     console.log('Paket güncellendi:', id);
     
-    // Güncellenmiş paketi döndür
     const updatedPackage = await FoodPackage.findByPk(id, {
       include: [{
         model: PackageLocation,
@@ -452,12 +494,33 @@ const updatePackage = async (req, res) => {
     });
   }
 };
-// ⭐ YENİ: Tüm aktif paketleri getir (alışveriş için)
+
 const getAllActivePackagesForShopping = async (req, res) => {
   try {
+    const userId = req.user?.id || req.user?.user_id;
+    let userLocation = null;
+    
+    if (userId) {
+      const { Location } = require('../models');
+      const defaultLocation = await Location.findOne({
+        where: { 
+          user_id: userId, 
+          is_default: true 
+        }
+      });
+      
+      if (defaultLocation && defaultLocation.latitude && defaultLocation.longitude) {
+        userLocation = {
+          lat: parseFloat(defaultLocation.latitude),
+          lng: parseFloat(defaultLocation.longitude)
+        };
+        console.log('Kullanıcının varsayılan adresi:', userLocation);
+      }
+    }
+
     const packages = await FoodPackage.findAll({
       where: { 
-        is_active: 1 
+        is_active: 1
       },
       include: [
         {
@@ -468,18 +531,126 @@ const getAllActivePackagesForShopping = async (req, res) => {
         {
           model: Seller,
           as: 'seller',
-          required: true,
-          attributes: ['seller_id', 'business_name', 'user_id']
+          required: false,
+          attributes: ['seller_id', 'user_id', 'business_name']
         }
       ],
       order: [['created_at', 'DESC']]
     });
-
+    
     console.log('Tüm aktif paketler alındı:', packages.length);
-    res.status(200).json({ success: true, data: packages });
+    res.status(200).json({ 
+      success: true, 
+      data: packages,
+      userLocation: userLocation 
+    });
   } catch (error) {
     console.error('Tüm aktif paketler alınırken hata:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Sunucu hatası', 
+      error: error.message 
+    });
+  }
+};
+
+// ID'ye göre kategori ile paket
+const getPackageByIdWithCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const paket = await FoodPackage.findByPk(id, {
+      include: packageIncludesWithCategory
+    });
+    
+    if (!paket) {
+      return res.status(404).json({ success: false, message: 'Paket bulunamadı' });
+    }
+    
+    res.status(200).json({ success: true, data: paket });
+  } catch (error) {
+    console.error('Paket detayı alınırken hata:', error);
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
+  }
+};
+
+// Kullanıcının kategori ile paketleri
+const getMyPackagesWithCategories = async (req, res) => {
+  try {
+    const user_id = req.user?.user_id || req.user?.id;
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    const seller = await Seller.findOne({ where: { user_id } });
+    if (!seller) {
+      return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
+    }
+
+    const packages = await FoodPackage.findAll({
+      where: { 
+        seller_id: seller.seller_id,
+        is_active: 1
+      },
+      include: packageIncludesWithCategory,
+      order: [['created_at', 'DESC']]
+    });
+    
+    res.status(200).json({ 
+      success: true, 
+      data: packages,
+      message: `${packages.length} aktif paket bulundu`
+    });
+  } catch (error) {
+    console.error('Kategori ile paketler alınırken hata:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
+  }
+};
+
+// Tüm aktif paketler kategori ile (alışveriş için gelişmiş)
+const getAllActivePackagesWithCategories = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.user_id;
+    let userLocation = null;
+    
+    if (userId) {
+      const { Location } = require('../models');
+      const defaultLocation = await Location.findOne({
+        where: { 
+          user_id: userId, 
+          is_default: true 
+        }
+      });
+      
+      if (defaultLocation && defaultLocation.latitude && defaultLocation.longitude) {
+        userLocation = {
+          lat: parseFloat(defaultLocation.latitude),
+          lng: parseFloat(defaultLocation.longitude)
+        };
+      }
+    }
+
+    const packages = await FoodPackage.findAll({
+      where: { 
+        is_active: 1
+      },
+      include: packageIncludesWithCategory,
+      order: [['created_at', 'DESC']]
+    });
+    
+    console.log('Kategori ile tüm aktif paketler alındı:', packages.length);
+    res.status(200).json({ 
+      success: true, 
+      data: packages,
+      userLocation: userLocation 
+    });
+  } catch (error) {
+    console.error('Kategori ile tüm aktif paketler alınırken hata:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Sunucu hatası', 
+      error: error.message 
+    });
   }
 };
 
@@ -487,9 +658,13 @@ module.exports = {
   createPackage,
   getPackageById,
   getActivePackages,
+  getActivePackagesWithCategories, // ⭐ BU FONKSİYON ARTIK TANIMLI
   getPackageHistory,
   getMyPackages,
+  getMyPackagesWithCategories,
   cancelPackage,
   updatePackage,
-  getAllActivePackagesForShopping
+  getAllActivePackagesForShopping,
+  getPackageByIdWithCategory,
+  getAllActivePackagesWithCategories
 };

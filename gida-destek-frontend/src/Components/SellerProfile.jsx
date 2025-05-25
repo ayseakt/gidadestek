@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { FaUser, FaEnvelope, FaPhone, FaLock, FaShieldAlt, FaCamera, FaCheck, FaSave,FaCreditCard, FaPlus, FaTrash, FaEdit, FaStar } from 'react-icons/fa';
+import { 
+  FaUser, 
+  FaEnvelope, 
+  FaPhone, 
+  FaLock, 
+  FaShieldAlt, 
+  FaCamera, 
+  FaCheck, 
+  FaSave,
+  FaStore,
+  FaClipboardList,
+  FaTag,
+  FaStar
+} from 'react-icons/fa';
 import { 
   getUserProfile, 
   updateUserProfile, 
@@ -7,22 +20,14 @@ import {
   uploadProfilePicture,
   enableTwoFactor,
   verifyTwoFactor,
-  disableTwoFactor 
+  disableTwoFactor,
+  getSellerProfile,
+  updateSellerProfile
 } from '../services/userService';
 import './UserProfile.css';
-import { 
-  getUserPaymentCards, 
-  addPaymentCard, 
-  updatePaymentCard, 
-  deletePaymentCard, 
-  setDefaultPaymentCard,
-  formatCardNumber,
-  detectCardBrand,
-  validateCardNumber 
-} from '../services/paymentCardService';
 
-function UserProfile() {
-  // User data state
+function SellerProfile() {
+  // User data state (temel kullanıcı bilgileri)
   const [userData, setUserData] = useState({
     first_name: '',
     last_name: '',
@@ -31,10 +36,22 @@ function UserProfile() {
     profileImage: null,
   });
 
+  // Seller data state (satıcıya özel bilgiler)
+  const [sellerData, setSellerData] = useState({
+    business_name: '',
+    business_type: '',
+    business_description: '',
+    rating: 0,
+    total_ratings: 0,
+    is_verified: false,
+    isProfileComplete: false
+  });
+
   // Form states
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({});
+  const [sellerFormData, setSellerFormData] = useState({});
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -43,46 +60,65 @@ function UserProfile() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
-  const [activeTab, setActiveTab] = useState('personal');
+  const [activeTab, setActiveTab] = useState('business');
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [imageFile, setImageFile] = useState(null);
-  const [paymentCards, setPaymentCards] = useState([]);
-  const [showCardModal, setShowCardModal] = useState(false);
-  const [editingCard, setEditingCard] = useState(null);
-  const [cardFormData, setCardFormData] = useState({
-    card_number: '',
-    card_holder_name: '',
-    expiry_month: '',
-    expiry_year: '',
-    card_nickname: '',
-    card_type: 'credit'
-  });
+
+  // İş türleri için seçenekler
+  const businessTypes = [
+    { value: 'restaurant', label: 'Restoran' },
+    { value: 'market', label: 'Market' },
+    { value: 'cafe', label: 'Kafe' },
+    { value: 'bakery', label: 'Fırın' },
+    { value: 'grocery', label: 'Bakkal' },
+    { value: 'other', label: 'Diğer' }
+  ];
+
   // Profil bilgilerini yükle
   useEffect(() => {
-
-    const fetchUserProfile = async () => {
+    const fetchProfiles = async () => {
       try {
         setLoading(true);
-        const response = await getUserProfile();
         
-        if (response.success) {
+        // Kullanıcı profili ve satıcı profili bilgilerini paralel olarak çek
+        const [userResponse, sellerResponse] = await Promise.all([
+          getUserProfile(),
+          getSellerProfile()
+        ]);
+        
+        if (userResponse.success) {
           const profileData = {
-            first_name: response.user.first_name || '',
-            last_name: response.user.last_name || '',
-            name: response.user.name || '',
-            email: response.user.email || '',
-            phone: response.user.phone || '',
-            profileImage: response.user.profile_picture 
-              ? `http://localhost:5051${response.user.profile_picture}` 
+            first_name: userResponse.user.first_name || '',
+            last_name: userResponse.user.last_name || '',
+            name: userResponse.user.name || '',
+            email: userResponse.user.email || '',
+            phone: userResponse.user.phone || '',
+            profileImage: userResponse.user.profile_picture 
+              ? `http://localhost:5051${userResponse.user.profile_picture}` 
               : null,
-            bio: response.user.bio || ''
+            bio: userResponse.user.bio || ''
           };
           
           setUserData(profileData);
           setFormData(profileData);
-          setTwoFactorEnabled(response.user.two_factor_enabled || false);
+          setTwoFactorEnabled(userResponse.user.two_factor_enabled || false);
+        }
+
+        if (sellerResponse.success) {
+          const sellerProfileData = {
+            business_name: sellerResponse.data.business_name || '',
+            business_type: sellerResponse.data.business_type || '',
+            business_description: sellerResponse.data.business_description || '',
+            rating: sellerResponse.data.rating || 0,
+            total_ratings: sellerResponse.data.total_ratings || 0,
+            is_verified: sellerResponse.data.is_verified || false,
+            isProfileComplete: sellerResponse.data.isProfileComplete || false
+          };
+          
+          setSellerData(sellerProfileData);
+          setSellerFormData(sellerProfileData);
         } else {
-          showNotification('Profil bilgileri yüklenemedi.', 'error');
+          showNotification('Satıcı profili bulunamadı.', 'error');
         }
       } catch (error) {
         console.error('Profil yükleme hatası:', error);
@@ -91,20 +127,8 @@ function UserProfile() {
         setLoading(false);
       }
     };
-    fetchUserProfile();
-    // Kullanıcının kartlarını yükle
-    const fetchPaymentCards = async () => {
-      try {
-        const response = await getUserPaymentCards();
-        if (response.success) {
-          setPaymentCards(response.cards || []);
-        }
-      } catch (error) {
-        console.error('Kartlar yüklenemedi:', error);
-      }
-    };
 
-    fetchPaymentCards();
+    fetchProfiles();
   }, []);
 
   // Handle input changes for personal info
@@ -112,6 +136,15 @@ function UserProfile() {
     const { name, value } = e.target;
     setFormData({
       ...formData,
+      [name]: value
+    });
+  };
+
+  // Handle input changes for seller info
+  const handleSellerInputChange = (e) => {
+    const { name, value } = e.target;
+    setSellerFormData({
+      ...sellerFormData,
       [name]: value
     });
   };
@@ -130,6 +163,7 @@ function UserProfile() {
     if (editMode) {
       // If exiting edit mode without saving, reset form data
       setFormData({...userData});
+      setSellerFormData({...sellerData});
     }
     setEditMode(!editMode);
   };
@@ -137,7 +171,6 @@ function UserProfile() {
   // Save personal information
   const savePersonalInfo = async () => {
     try {
-      // API request data'yı hazırla
       const updateData = {
         firstName: formData.first_name,
         lastName: formData.last_name,
@@ -149,20 +182,37 @@ function UserProfile() {
       const response = await updateUserProfile(updateData);
       
       if (response.success) {
-        // Profil resmini yükle (eğer değiştiyse)
         if (imageFile) {
           await handleProfileImageUpload();
         }
         
         setUserData({...formData});
         setEditMode(false);
-        showNotification('Bilgileriniz başarıyla güncellendi.', 'success');
+        showNotification('Kişisel bilgileriniz başarıyla güncellendi.', 'success');
       } else {
         showNotification(response.message || 'Bir hata oluştu.', 'error');
       }
     } catch (error) {
       console.error('Güncelleme hatası:', error);
       showNotification(error.message || 'Bilgiler güncellenirken bir hata oluştu.', 'error');
+    }
+  };
+
+  // Save seller information
+  const saveSellerInfo = async () => {
+    try {
+      const response = await updateSellerProfile(sellerFormData);
+      
+      if (response.success) {
+        setSellerData({...sellerFormData});
+        setEditMode(false);
+        showNotification('İşletme bilgileriniz başarıyla güncellendi.', 'success');
+      } else {
+        showNotification(response.message || 'Bir hata oluştu.', 'error');
+      }
+    } catch (error) {
+      console.error('Satıcı profili güncelleme hatası:', error);
+      showNotification(error.message || 'İşletme bilgileri güncellenirken bir hata oluştu.', 'error');
     }
   };
 
@@ -199,7 +249,6 @@ function UserProfile() {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     
-    // Validation
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       showNotification('Yeni şifreler eşleşmiyor.', 'error');
       return;
@@ -217,7 +266,6 @@ function UserProfile() {
       });
       
       if (response.success) {
-        // Reset form and show success message
         setPasswordForm({
           currentPassword: '',
           newPassword: '',
@@ -237,7 +285,6 @@ function UserProfile() {
   const toggleTwoFactor = async () => {
     try {
       if (!twoFactorEnabled) {
-        // İki adımlı doğrulamayı etkinleştir
         const response = await enableTwoFactor();
         
         if (response.success) {
@@ -246,7 +293,6 @@ function UserProfile() {
           showNotification(response.message || 'İki adımlı doğrulama etkinleştirilemedi.', 'error');
         }
       } else {
-        // İki adımlı doğrulamayı devre dışı bırak
         const response = await disableTwoFactor();
         
         if (response.success) {
@@ -311,7 +357,6 @@ function UserProfile() {
       type
     });
 
-    // Hide notification after 3 seconds
     setTimeout(() => {
       setNotification({
         show: false,
@@ -320,163 +365,6 @@ function UserProfile() {
       });
     }, 3000);
   };
-  // Kart formu submit
-const handleCardSubmit = async (e) => {
-  e.preventDefault();
-  
-  // Validasyon
-  if (!validateCardNumber(cardFormData.card_number)) {
-    showNotification('Geçersiz kart numarası.', 'error');
-    return;
-  }
-  
-  if (!cardFormData.card_holder_name.trim()) {
-    showNotification('Kart sahibi adı gerekli.', 'error');
-    return;
-  }
-  
-  if (!cardFormData.expiry_month || !cardFormData.expiry_year) {
-    showNotification('Son kullanma tarihi gerekli.', 'error');
-    return;
-  }
-  
-  try {
-    const cardData = {
-      ...cardFormData,
-      card_brand: detectCardBrand(cardFormData.card_number),
-      last_four_digits: cardFormData.card_number.slice(-4)
-    };
-    
-    let response;
-    if (editingCard) {
-      response = await updatePaymentCard(editingCard.card_id, cardData);
-    } else {
-      response = await addPaymentCard(cardData);
-    }
-    
-    if (response.success) {
-      // Kartları yeniden yükle
-      const cardsResponse = await getUserPaymentCards();
-      if (cardsResponse.success) {
-        setPaymentCards(cardsResponse.cards || []);
-      }
-      
-      setShowCardModal(false);
-      setEditingCard(null);
-      resetCardForm();
-      showNotification(
-        editingCard ? 'Kart başarıyla güncellendi.' : 'Kart başarıyla eklendi.', 
-        'success'
-      );
-    } else {
-      showNotification(response.message || 'Kart işlemi başarısız.', 'error');
-    }
-  } catch (error) {
-    console.error('Kart işlemi hatası:', error);
-    showNotification('Kart işlemi sırasında bir hata oluştu.', 'error');
-  }
-};
-
-// Kart silme
-const handleDeleteCard = async (cardId) => {
-  if (!window.confirm('Bu kartı silmek istediğinizden emin misiniz?')) {
-    return;
-  }
-  
-  try {
-    const response = await deletePaymentCard(cardId);
-    
-    if (response.success) {
-      setPaymentCards(paymentCards.filter(card => card.card_id !== cardId));
-      showNotification('Kart başarıyla silindi.', 'success');
-    } else {
-      showNotification(response.message || 'Kart silinemedi.', 'error');
-    }
-  } catch (error) {
-    console.error('Kart silme hatası:', error);
-    showNotification('Kart silinirken bir hata oluştu.', 'error');
-  }
-};
-
-// Varsayılan kart ayarlama
-const handleSetDefaultCard = async (cardId) => {
-  try {
-    const response = await setDefaultPaymentCard(cardId);
-    
-    if (response.success) {
-      // Kartları güncelle
-      setPaymentCards(paymentCards.map(card => ({
-        ...card,
-        is_default: card.card_id === cardId
-      })));
-      showNotification('Varsayılan kart ayarlandı.', 'success');
-    } else {
-      showNotification(response.message || 'Varsayılan kart ayarlanamadı.', 'error');
-    }
-  } catch (error) {
-    console.error('Varsayılan kart hatası:', error);
-    showNotification('İşlem sırasında bir hata oluştu.', 'error');
-  }
-};
-
-// Kart düzenleme
-const handleEditCard = (card) => {
-  setEditingCard(card);
-  setCardFormData({
-    card_number: '', // Güvenlik için boş bırak
-    card_holder_name: card.card_holder_name,
-    expiry_month: card.expiry_month.toString(),
-    expiry_year: card.expiry_year.toString(),
-    card_nickname: card.card_nickname || '',
-    card_type: card.card_type
-  });
-  setShowCardModal(true);
-};
-
-// Kart formu sıfırlama
-const resetCardForm = () => {
-  setCardFormData({
-    card_number: '',
-    card_holder_name: '',
-    expiry_month: '',
-    expiry_year: '',
-    card_nickname: '',
-    card_type: 'credit'
-  });
-};
-
-// Kart formu input değişiklikleri
-const handleCardInputChange = (e) => {
-  const { name, value } = e.target;
-  
-  if (name === 'card_number') {
-    // Kart numarasını formatla
-    const formatted = formatCardNumber(value);
-    setCardFormData({
-      ...cardFormData,
-      [name]: formatted
-    });
-  } else {
-    setCardFormData({
-      ...cardFormData,
-      [name]: value
-    });
-  }
-};
-
-// Kart markası ikonu alma
-const getCardBrandIcon = (brand) => {
-  const brandIcons = {
-    visa: '💳',
-    mastercard: '💳',
-    amex: '💳',
-    discover: '💳',
-    diners: '💳',
-    jcb: '💳',
-    unionpay: '💳'
-  };
-  return brandIcons[brand] || '💳';
-};
 
   if (loading) {
     return <div className="loading">Yükleniyor...</div>;
@@ -498,35 +386,42 @@ const getCardBrandIcon = (brand) => {
           </div>
           <h2>{userData.first_name} {userData.last_name}</h2>
           <p>{userData.email}</p>
-          
+          {sellerData.is_verified && (
+            <div className="verified-badge">
+              <FaCheck /> Doğrulanmış Satıcı
+            </div>
+          )}
+          {sellerData.rating > 0 && (
+            <div className="rating-display">
+              <FaStar /> {sellerData.rating} ({sellerData.total_ratings} değerlendirme)
+            </div>
+          )}
         </div>
         
-        
-          <div 
-            className={`profile-menu-item ${activeTab === 'personal' ? 'active' : ''}`}
-            onClick={() => setActiveTab('personal')}
-          >
-            <FaUser /> Kişisel Bilgiler
-          </div>
-          <div 
-            className={`profile-menu-item ${activeTab === 'security' ? 'active' : ''}`}
-            onClick={() => setActiveTab('security')}
-          >
-            <FaLock /> Güvenlik
-          </div>
-          <div 
-            className={`profile-menu-item ${activeTab === 'twofactor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('twofactor')}
-          >
-            <FaShieldAlt /> İki Adımlı Doğrulama
-          </div>
-          <div 
-            className={`profile-menu-item ${activeTab === 'cards' ? 'active' : ''}`}
-            onClick={() => setActiveTab('cards')}
-          >
-            <FaCreditCard /> Kayıtlı Kartlarım
-          </div>
-        
+        <div 
+          className={`profile-menu-item ${activeTab === 'business' ? 'active' : ''}`}
+          onClick={() => setActiveTab('business')}
+        >
+          <FaStore /> İşletme Bilgileri
+        </div>
+        <div 
+          className={`profile-menu-item ${activeTab === 'personal' ? 'active' : ''}`}
+          onClick={() => setActiveTab('personal')}
+        >
+          <FaUser /> Kişisel Bilgiler
+        </div>
+        <div 
+          className={`profile-menu-item ${activeTab === 'security' ? 'active' : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          <FaLock /> Güvenlik
+        </div>
+        <div 
+          className={`profile-menu-item ${activeTab === 'twofactor' ? 'active' : ''}`}
+          onClick={() => setActiveTab('twofactor')}
+        >
+          <FaShieldAlt /> İki Adımlı Doğrulama
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -535,6 +430,86 @@ const getCardBrandIcon = (brand) => {
         {notification.show && (
           <div className={`profile-notification ${notification.type}`}>
             {notification.message}
+          </div>
+        )}
+
+        {/* Business Information Tab */}
+        {activeTab === 'business' && (
+          <div className="profile-section">
+            <div className="profile-section-header">
+              <h2>İşletme Bilgileri</h2>
+              <button className="edit-button" onClick={toggleEditMode}>
+                {editMode ? 'İptal' : 'Düzenle'}
+              </button>
+            </div>
+
+            <div className="profile-form">
+              <div className="form-group">
+                <label><FaStore /> İşletme Adı</label>
+                {editMode ? (
+                  <input 
+                    type="text" 
+                    name="business_name" 
+                    value={sellerFormData.business_name} 
+                    onChange={handleSellerInputChange} 
+                    placeholder="İşletmenizin adını girin"
+                  />
+                ) : (
+                  <p>{sellerData.business_name || 'Henüz belirtilmemiş'}</p>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label><FaTag /> İşletme Türü</label>
+                {editMode ? (
+                  <select 
+                    name="business_type" 
+                    value={sellerFormData.business_type} 
+                    onChange={handleSellerInputChange}
+                  >
+                    <option value="">Seçiniz</option>
+                    {businessTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p>
+                    {businessTypes.find(type => type.value === sellerData.business_type)?.label || 'Henüz belirtilmemiş'}
+                  </p>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label><FaClipboardList /> İşletme Açıklaması</label>
+                {editMode ? (
+                  <textarea 
+                    name="business_description" 
+                    value={sellerFormData.business_description || ''} 
+                    onChange={handleSellerInputChange}
+                    rows="4"
+                    placeholder="İşletmeniz hakkında bilgi verin"
+                  />
+                ) : (
+                  <p>{sellerData.business_description || 'Henüz bir açıklama eklenmemiş.'}</p>
+                )}
+              </div>
+
+              {editMode && activeTab === 'business' && (
+                <div className="form-actions">
+                  <button className="save-button" onClick={saveSellerInfo}>
+                    <FaSave /> İşletme Bilgilerini Kaydet
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {!sellerData.isProfileComplete && (
+              <div className="profile-warning">
+                <p>⚠️ İşletme profilinizi tamamlayın ve daha fazla müşteriye ulaşın!</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -644,10 +619,10 @@ const getCardBrandIcon = (brand) => {
                 )}
               </div>
 
-              {editMode && (
+              {editMode && activeTab === 'personal' && (
                 <div className="form-actions">
                   <button className="save-button" onClick={savePersonalInfo}>
-                    <FaSave /> Kaydet
+                    <FaSave /> Kişisel Bilgileri Kaydet
                   </button>
                 </div>
               )}
@@ -743,81 +718,6 @@ const getCardBrandIcon = (brand) => {
             </div>
           </div>
         )}
-        {/* Payment Cards Tab */}
-        {activeTab === 'cards' && (
-          <div className="profile-section">
-            <div className="profile-section-header">
-              <h2>Kayıtlı Kartlarım</h2>
-              <button 
-                className="add-card-button"
-                onClick={() => {
-                  setEditingCard(null);
-                  resetCardForm();
-                  setShowCardModal(true);
-                }}
-              >
-                <FaPlus /> Yeni Kart Ekle
-              </button>
-            </div>
-
-            <div className="payment-cards-list">
-              {paymentCards.length === 0 ? (
-                <div className="no-cards">
-                  <FaCreditCard className="no-cards-icon" />
-                  <h3>Henüz kayıtlı kartınız yok</h3>
-                  <p>Hızlı ödeme yapabilmek için kartınızı ekleyin.</p>
-                </div>
-              ) : (
-                paymentCards.map((card) => (
-                  <div key={card.card_id} className={`payment-card-item ${card.is_default ? 'default-card' : ''}`}>
-                    <div className="card-info">
-                      <div className="card-header">
-                        <span className="card-brand">
-                          {getCardBrandIcon(card.card_brand)} {card.card_brand.toUpperCase()}
-                        </span>
-                        {card.is_default && <span className="default-badge"><FaStar /> Varsayılan</span>}
-                      </div>
-                      <div className="card-number">**** **** **** {card.last_four_digits}</div>
-                      <div className="card-details">
-                        <span className="card-holder">{card.card_holder_name}</span>
-                        <span className="card-expiry">{card.expiry_month.toString().padStart(2, '0')}/{card.expiry_year}</span>
-                      </div>
-                      {card.card_nickname && (
-                        <div className="card-nickname">"{card.card_nickname}"</div>
-                      )}
-                    </div>
-                    
-                    <div className="card-actions">
-                      {!card.is_default && (
-                        <button 
-                          className="set-default-btn"
-                          onClick={() => handleSetDefaultCard(card.card_id)}
-                          title="Varsayılan Yap"
-                        >
-                          <FaStar />
-                        </button>
-                      )}
-                      <button 
-                        className="edit-card-btn"
-                        onClick={() => handleEditCard(card)}
-                        title="Düzenle"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button 
-                        className="delete-card-btn"
-                        onClick={() => handleDeleteCard(card.card_id)}
-                        title="Sil"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Verification Modal */}
@@ -848,132 +748,8 @@ const getCardBrandIcon = (brand) => {
           </div>
         </div>
       )}
-      {/* Card Modal */}
-      {showCardModal && (
-        <div className="modal-overlay">
-          <div className="card-modal">
-            <div className="modal-header">
-              <h3>{editingCard ? 'Kartı Düzenle' : 'Yeni Kart Ekle'}</h3>
-              <button 
-                className="close-modal-btn"
-                onClick={() => {
-                  setShowCardModal(false);
-                  setEditingCard(null);
-                  resetCardForm();
-                }}
-              >
-                ×
-              </button>
-            </div>
-            
-            <form className="card-form" onSubmit={handleCardSubmit}>
-              {!editingCard && (
-                <div className="form-group">
-                  <label>Kart Numarası</label>
-                  <input 
-                    type="text" 
-                    name="card_number"
-                    value={cardFormData.card_number}
-                    onChange={handleCardInputChange}
-                    placeholder="1234 5678 9012 3456"
-                    maxLength="19"
-                    required
-                  />
-                </div>
-              )}
-              
-              <div className="form-group">
-                <label>Kart Sahibi Adı</label>
-                <input 
-                  type="text" 
-                  name="card_holder_name"
-                  value={cardFormData.card_holder_name}
-                  onChange={handleCardInputChange}
-                  placeholder="AHMET YILMAZ"
-                  style={{ textTransform: 'uppercase' }}
-                  required
-                />
-              </div>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Ay</label>
-                  <select 
-                    name="expiry_month"
-                    value={cardFormData.expiry_month}
-                    onChange={handleCardInputChange}
-                    required
-                  >
-                    <option value="">Ay</option>
-                    {Array.from({length: 12}, (_, i) => i + 1).map(month => (
-                      <option key={month} value={month}>
-                        {month.toString().padStart(2, '0')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Yıl</label>
-                  <select 
-                    name="expiry_year"
-                    value={cardFormData.expiry_year}
-                    onChange={handleCardInputChange}
-                    required
-                  >
-                    <option value="">Yıl</option>
-                    {Array.from({length: 10}, (_, i) => new Date().getFullYear() + i).map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="form-group">
-                <label>Kart Tipi</label>
-                <select 
-                  name="card_type"
-                  value={cardFormData.card_type}
-                  onChange={handleCardInputChange}
-                >
-                  <option value="credit">Kredi Kartı</option>
-                  <option value="debit">Banka Kartı</option>
-                </select>
-              </div>
-              
-              <div className="form-group">
-                <label>Kart Takma Adı (Opsiyonel)</label>
-                <input 
-                  type="text" 
-                  name="card_nickname"
-                  value={cardFormData.card_nickname}
-                  onChange={handleCardInputChange}
-                  placeholder="İş Kartım, Kişisel Kart vb."
-                  maxLength="50"
-                />
-              </div>
-              
-              <div className="modal-actions">
-                <button 
-                  type="button" 
-                  className="cancel-button"
-                  onClick={() => {
-                    setShowCardModal(false);
-                    setEditingCard(null);
-                    resetCardForm();
-                  }}
-                >
-                  İptal
-                </button>
-                <button type="submit" className="save-button">
-                  <FaSave /> {editingCard ? 'Güncelle' : 'Kaydet'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-export default UserProfile;
+export default SellerProfile;

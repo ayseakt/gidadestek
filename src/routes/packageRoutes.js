@@ -29,5 +29,10 @@ router.post('/:id/cancel', packageController.cancelPackage);
 
 // ⭐ Belirli paket detayı (en sonda olmalı - çünkü /:id şeklinde)
 router.get('/:id', packageController.getPackageById);
+router.get('/active-with-categories', packageController.getActivePackagesWithCategories);
+router.get('/my-packages-with-categories', packageController.getMyPackagesWithCategories);
+router.get('/all-active-with-categories', packageController.getAllActivePackagesWithCategories);
+router.get('/:id/with-category', packageController.getPackageByIdWithCategory);
+
 
 module.exports = router;

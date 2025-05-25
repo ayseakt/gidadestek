@@ -10,7 +10,7 @@ import WelcomeScreen from './Components/WelcomeScreen';
 import { CartProvider } from './contexts/cartContext';
 import { AuthProvider } from './context/authContext'; // ✅ EKLENDİ
 import './App.css';
-
+import SellerProfile from './Components/SellerProfile';
 const MainScreen = ({ userData, onLogout }) => {
   return (
     <>
@@ -24,6 +24,7 @@ const MainScreen = ({ userData, onLogout }) => {
           <Route path="/favoriler" element={<Favorites />} />
           <Route path="/odeme" element={<div>Ödeme Sayfası (Henüz eklenmedi)</div>} />
           <Route path="/giris" element={<Navigate to="/" replace />} />
+          <Route path="/seller-profile" element={<SellerProfile />} />
         </Routes>
       </main>
       <footer className="footer">

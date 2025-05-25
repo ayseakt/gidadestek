@@ -398,10 +398,22 @@ function SofraniPaylas() {
       function toMySQLDateTime(dateString) {
         if (!dateString) return '';
         const d = new Date(dateString);
+        // Geçersiz tarih kontrolü
+        if (isNaN(d.getTime())) return '';
+        
         const pad = n => n.toString().padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       }
-      
+      // Tarih doğrulaması yap
+          if (formData.pickup_start_time && formData.pickup_end_time) {
+            const startTime = new Date(formData.pickup_start_time);
+            const endTime = new Date(formData.pickup_end_time);
+            
+            if (endTime <= startTime) {
+              throw new Error('Bitiş saati başlangıç saatinden sonra olmalıdır!');
+            }
+          }
+            
       packageData.append('pickup_start_time', toMySQLDateTime(formData.pickup_start_time));
       packageData.append('pickup_end_time', toMySQLDateTime(formData.pickup_end_time));
       packageData.append('description', formData.description || '');
@@ -938,6 +950,7 @@ function SofraniPaylas() {
         </div>
       </div>
 
+
       {/* Sekmeler */}
       <div className="host-tabs">
         <div 
@@ -1028,7 +1041,7 @@ function SofraniPaylas() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Üretim Tarihi</label>
+                  <label>Teslim Etme Başlangıç saati  </label>
                   <input 
                     type="datetime-local" 
                     name="pickup_start_time"
@@ -1038,7 +1051,7 @@ function SofraniPaylas() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Son Tüketim Tarihi</label>
+                  <label>Teslim Etme Bitiş Saati </label>
                   <input 
                     type="datetime-local" 
                     name="pickup_end_time"
@@ -1149,7 +1162,7 @@ function SofraniPaylas() {
               </div>
                  <div>
                     <label>
-                      Geçerlilik Başlangıç Tarihi:
+                      Üretim Tarihi :
                       <input
                         type="date"
                         name="available_from"
@@ -1161,7 +1174,7 @@ function SofraniPaylas() {
                   </div>
                   <div>
                     <label>
-                      Geçerlilik Bitiş Tarihi:
+                      Son Tüketim Tarihi:
                       <input
                         type="date"
                         name="available_until"

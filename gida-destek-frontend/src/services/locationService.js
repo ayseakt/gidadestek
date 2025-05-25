@@ -1,9 +1,44 @@
-// services/locationService.js - Frontend versiyonu
+// services/locationService.js - Düzeltilmiş versiyon
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5051/api';
 
 class LocationService {
   
-  // TÜM LOKASYONLARİ GETİR - EKLENDİ
+  // ⭐ EKSİK FONKSİYON - Home.jsx'te kullanılan getLocations fonksiyonu
+  static async getLocations() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/locations`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Lokasyonlar alınamadı');
+      }
+      
+      return {
+        data: {
+          success: true,
+          data: result.data || result
+        }
+      };
+    } catch (error) {
+      console.error('getLocations hatası:', error);
+      return {
+        data: {
+          success: false,
+          message: error.message,
+          data: []
+        }
+      };
+    }
+  }
+
+  // TÜM LOKASYONLARİ GETİR - Mevcut fonksiyon
   static async getAllLocations() {
     try {
       const response = await fetch(`${API_BASE_URL}/locations`, {
@@ -40,7 +75,7 @@ class LocationService {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // Token varsa
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       

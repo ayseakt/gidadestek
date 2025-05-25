@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Home.css';
 import DonationCard from './DonationCard';
+import locationService from '../../services/locationService'; // Bu import'u ekleyin
 import { 
   FaUser, 
   FaBell, 
@@ -16,6 +17,8 @@ import {
   FaStore,
   FaSmile,
   FaPizzaSlice,
+  FaCalendarAlt,     // Yeni eklendi - Son tüketim tarihi için
+  FaCalendarCheck,  
   FaBolt,
   FaWindowClose,
   FaFilter,
@@ -59,9 +62,121 @@ const Home = () => {
   const googleMapRef = useRef(null);
   
   const categories = ['Tümü', 'Restoran', 'Fırın & Pastane', 'Market', 'Kafe', 'Manav', 'Diğer'];
+// Tarih formatlaması yardımcı fonksiyonları
+const formatTime = (timeString) => {
+  if (!timeString) return 'Belirtilmemiş';
 
+  try {
+    let date;
+    if (timeString.length <= 8 && /^\d{2}:\d{2}:\d{2}$/.test(timeString)) {
+      // Eğer sadece saat formatındaysa, bugünün tarihiyle birleştir
+      const today = new Date().toISOString().split('T')[0]; // "2024-05-25"
+      date = new Date(`${today}T${timeString}`);
+    } else {
+      // Zaten ISO formatındaysa doğrudan parse et
+      date = new Date(timeString);
+    }
+
+    if (isNaN(date.getTime())) return 'Belirtilmemiş';
+
+    return date.toLocaleTimeString('tr-TR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.warn('Zaman formatlaması hatası:', error);
+    return 'Belirtilmemiş';
+  }
+};
+
+
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'Belirtilmemiş';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Belirtilmemiş';
+    return date.toLocaleDateString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.warn('Tarih formatlaması hatası:', error);
+    return 'Belirtilmemiş';
+  }
+};
+
+const formatDateRange = (startTime, endTime) => {
+  const start = formatTime(startTime);
+  const end = formatTime(endTime);
+  if (start === 'Belirtilmemiş' || end === 'Belirtilmemiş') {
+    return 'Belirtilmemiş';
+  }
+  return `${start}-${end}`;
+};
   // Maksimum mesafe sınırı (km)
   const MAX_DISTANCE_KM = 10;
+  // Kullanıcının varsayılan adresini getir
+const getUserDefaultLocation = async () => {
+  try {
+    const response = await locationService.getLocations();
+    if (response.data.success) {
+      const defaultLocation = response.data.data.find(loc => loc.is_default);
+      if (defaultLocation && defaultLocation.latitude && defaultLocation.longitude) {
+        const defaultPos = {
+          lat: parseFloat(defaultLocation.latitude),
+          lng: parseFloat(defaultLocation.longitude)
+        };
+        setUserLocation(defaultPos);
+        console.log('Varsayılan adres konumu:', defaultPos);
+        return defaultPos;
+      }
+    }
+    // Varsayılan adres yoksa mevcut konumu al
+    return getUserCurrentLocation();
+  } catch (error) {
+    console.error('Varsayılan adres alınırken hata:', error);
+    return getUserCurrentLocation();
+  }
+};
+
+// Mevcut konum alma fonksiyonunu ayır
+const getUserCurrentLocation = () => {
+  return new Promise((resolve, reject) => {
+    if (navigator.geolocation) {
+      setIsLoadingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserLocation(userPos);
+          setIsLoadingLocation(false);
+          console.log('Mevcut konum alındı:', userPos);
+          resolve(userPos);
+        },
+        (error) => {
+          console.error("Konum alırken hata: ", error);
+          setIsLoadingLocation(false);
+          const defaultPos = { lat: 41.0082, lng: 28.9784 };
+          setUserLocation(defaultPos);
+          resolve(defaultPos);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        }
+      );
+    } else {
+      const defaultPos = { lat: 41.0082, lng: 28.9784 };
+      setUserLocation(defaultPos);
+      resolve(defaultPos);
+    }
+  });
+};
 
   const loadRealPackages = async () => {
     try {
@@ -357,38 +472,9 @@ const handleAddToCart = async (business, quantity = 1) => {
   };
 
   // Kullanıcı konumunu al
-  const getUserLocation = () => {
-    if (navigator.geolocation) {
-      setIsLoadingLocation(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserLocation(userPos);
-          setIsLoadingLocation(false);
-          console.log('Kullanıcı konumu alındı:', userPos);
-          if (showMapView && window.google) {
-            initMap();
-          }
-        },
-        (error) => {
-          console.error("Konum alırken hata: ", error);
-          setIsLoadingLocation(false);
-          setUserLocation({ lat: 41.0082, lng: 28.9784 });
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
-        }
-      );
-    } else {
-      console.log("Tarayıcı konum desteği sağlamıyor.");
-      setUserLocation({ lat: 41.0082, lng: 28.9784 });
-    }
-  };
+const getUserLocation = async () => {
+  await getUserDefaultLocation();
+};
 
   // Mesafe hesaplama (Haversine formülü)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -405,7 +491,6 @@ const handleAddToCart = async (business, quantity = 1) => {
   };
 
   // Gerçek paket verilerini dönüştür
-// Gerçek paket verilerini dönüştür - Düzeltilmiş versiyon
 const convertRealPackageToBusinessFormat = (packageData) => {
   if (!packageData || typeof packageData !== 'object') {
     console.warn('Geçersiz paket verisi:', packageData);
@@ -417,7 +502,6 @@ const convertRealPackageToBusinessFormat = (packageData) => {
     return null;
   }
 
-  // package_id'yi integer olarak kaydet
   const packageId = parseInt(packageData.package_id);
   if (isNaN(packageId)) {
     console.warn('Geçersiz package_id:', packageData.package_id);
@@ -457,46 +541,69 @@ const convertRealPackageToBusinessFormat = (packageData) => {
       `${actualDistance.toFixed(1)}km`;
   }
 
-  let timeDisplay = 'Belirtilmemiş';
-  if (packageData.pickup_start_time && packageData.pickup_end_time) {
-    try {
-      const startTime = new Date(packageData.pickup_start_time).toLocaleTimeString('tr-TR', {
-        hour: '2-digit', 
-        minute: '2-digit'
-      });
-      const endTime = new Date(packageData.pickup_end_time).toLocaleTimeString('tr-TR', {
-        hour: '2-digit', 
-        minute: '2-digit'
-      });
-      timeDisplay = `${startTime}-${endTime}`;
-    } catch (error) {
-      console.warn('Zaman parse hatası:', error);
-    }
+  // Zaman formatlaması - pickup_start_time ve pickup_end_time kullan
+  const timeDisplay = formatDateRange(packageData.pickup_start_time, packageData.pickup_end_time);
+  // Kategori mapping - category ilişkisinden al
+  let categoryName = 'Diğer';
+  if (packageData.category && packageData.category.name) {
+    categoryName = packageData.category.name;
+  } else {
+    // Fallback kategori mapping
+    const categoryMap = {
+      1: 'Restoran',
+      2: 'Fırın & Pastane', 
+      3: 'Market',
+      4: 'Kafe',
+      5: 'Manav',
+      6: 'Diğer'
+    };
+    categoryName = categoryMap[packageData.category_id] || 'Diğer';
   }
 
-  // ⭐ DÜZELTME: Tüm ID alanlarını integer yapın
+  // Resim URL'si - eğer varsa kullan, yoksa default
+  let imageUrl = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop';
+  
+  // Kategoriye göre default resimler
+  const categoryImages = {
+    'Restoran': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
+    'Fırın & Pastane': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&h=200&fit=crop',
+    'Market': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
+    'Kafe': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop',
+    'Manav': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&h=200&fit=crop',
+    'Diğer': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop'
+  };
+  
+  imageUrl = categoryImages[categoryName] || imageUrl;
+
   return {
-    id: packageId,  // ⭐ DEĞIŞTI: Integer olarak kaydet
-    realId: packageId,  // integer ID backend için
-    packageId: packageId, // explicit integer field
-    storeName: packageData.seller?.business_name || 'Mağaza',
-    product: packageData.package_name || 'Paket',
+    id: packageId,
+    realId: packageId,
+    packageId: packageId,
+    storeName: packageData.seller?.business_name || 'Mağaza Adı Belirtilmemiş',
+    product: packageData.package_name || 'Paket Adı Belirtilmemiş',
+    description: packageData.description || 'Açıklama bulunmuyor',
     oldPrice: parseFloat(packageData.original_price) || 0,
     newPrice: parseFloat(packageData.discounted_price) || 0,
     distance,
     time: timeDisplay,
-    category: 'Restoran',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
-    savedCount: Math.floor(Math.random() * 50) + 1,
+    category: categoryName,
+    image: imageUrl,
+    savedCount: Math.floor(Math.random() * 50) + 1, // Bu gerçek veriye dönüştürülebilir
     location: { lat, lng },
-    sellerId: packageData.seller?.user_id,
-    isOwnPackage: packageData.seller?.user_id === currentUserId,
+    sellerId: packageData.seller?.user_id || packageData.seller_id,
+    isOwnPackage: packageData.seller?.user_id === currentUserId || packageData.seller_id === currentUserId,
     actualDistance,
     isDemo: false,
-    quantityAvailable: packageData.quantity_available || 1
+    quantityAvailable: packageData.quantity_available || 1,
+    pickupStartTime: packageData.pickup_start_time,
+    pickupEndTime: packageData.pickup_end_time,
+    availableFrom: packageData.available_from,
+    availableUntil: packageData.available_until,
+    isActive: packageData.is_active,
+    createdAt: packageData.created_at,
+    updatedAt: packageData.updated_at
   };
 };
-
 
   const validRealPackages = realPackages
     .map(convertRealPackageToBusinessFormat)
@@ -617,7 +724,8 @@ const convertRealPackageToBusinessFormat = (packageData) => {
         setShowLocationPermission(true);
       }, 1000);
     } else {
-      getUserLocation();
+      // getUserLocation yerine getUserDefaultLocation çağır
+      getUserDefaultLocation();
     }
 
     const savedFavorites = localStorage.getItem('favorites');
@@ -713,6 +821,7 @@ const convertRealPackageToBusinessFormat = (packageData) => {
 
         </div>
 
+
         <div className="content-grid">
           {/* Sol Filtre Bölümü */}
           <div className={`filter-column ${showMobileFilters ? 'mobile-show' : ''}`}>
@@ -724,6 +833,7 @@ const convertRealPackageToBusinessFormat = (packageData) => {
               onSortChange={(option) => setSortOption(option)}
               onClose={() => setShowMobileFilters(false)}
             />
+
           </div>
           
           {/* Ana İçerik */}
@@ -792,7 +902,7 @@ const convertRealPackageToBusinessFormat = (packageData) => {
                               alt={business.product} 
                               className="product-image" 
                             />
-                            <div 
+                            {/* <div 
                               className="favorite-button" 
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -803,7 +913,7 @@ const convertRealPackageToBusinessFormat = (packageData) => {
                                 <FaHeart className="favorited" /> : 
                                 <FaRegHeart />
                               }
-                            </div>
+                            </div> */}
                             <div className="food-saved-tag">
                               <FaLeaf /> {business.savedCount} kurtarıldı
                             </div>
@@ -865,25 +975,7 @@ const convertRealPackageToBusinessFormat = (packageData) => {
           </div>
           
           {/* Sağ Impact Stats */}
-          <div className="stats-column">
-            <div className="impact-stats-container">
-              <div className="impact-title">🌍 Toplam Etki</div>
-              <div className="stats-grid">
-                <div className="stat-item">
-                  <div className="stat-value">{impactStats.savedFood}</div>
-                  <div className="stat-label">Kurtarılan Yemek</div>
-                </div>
-                <div className="stat-item">
-                  <div className="stat-value">{impactStats.co2Reduced}kg</div>
-                  <div className="stat-label">Azaltılan CO₂</div>
-                </div>
-                <div className="stat-item">
-                  <div className="stat-value">{impactStats.userCount}</div>
-                  <div className="stat-label">Aktif Kullanıcı</div>
-                </div>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
 
@@ -945,40 +1037,70 @@ const convertRealPackageToBusinessFormat = (packageData) => {
               
               <div className="product-detail-info">
                 <div className="detail-store-name">
-                  <FaStore /> {selectedProduct.storeName}
+                  <FaStore /> {selectedProduct.storeName || selectedProduct.seller?.business_name || 'Mağaza'}
                 </div>
-                <h2 className="detail-product-name">{selectedProduct.product}</h2>
+                <h2 className="detail-product-name">
+                  {selectedProduct.product || selectedProduct.package_name}
+                </h2>
                 
                 <div className="detail-category">
-                  📂 Kategori: {selectedProduct.category}
+                  📂 Kategori: {selectedProduct.category?.name || selectedProduct.category || 'Genel'}
                 </div>
                 
                 <div className="detail-collection-info">
-                  <div className="detail-pickup-time">
-                    <FaClock /> Teslim Zamanı: {selectedProduct.time}
-                  </div>
+                    <div className="detail-pickup-time">
+                      <FaClock /> Teslim Zamanı: {
+                        selectedProduct.time || 
+                        formatDateRange(selectedProduct.pickupStartTime, selectedProduct.pickupEndTime)
+                      }
+                    </div>
                   <div className="detail-distance">
-                    <FaMapMarkerAlt /> Uzaklık: {selectedProduct.distance}
+                    <FaMapMarkerAlt /> Uzaklık: {selectedProduct.distance || 'Hesaplanıyor...'}
+                  </div>
+                </div>
+
+                {/* Yeni eklenen: Son tüketim tarihi */}
+                <div className="detail-expiry-info">
+                    <div className="detail-expiry-date">
+                      <FaCalendarAlt /> Son Tüketim: {
+                        selectedProduct.availableUntil ? 
+                        formatDate(selectedProduct.availableUntil) : 
+                        'Belirtilmemiş'
+                      }
+                    </div>
+                  <div className="detail-available-from">
+                    <FaCalendarCheck /> Müsait Tarih: {
+                      selectedProduct.availableFrom ? 
+                      formatDate(selectedProduct.availableFrom) : 
+                      'Şimdi'
+                    }
                   </div>
                 </div>
                 
                 <div className="detail-price-container">
                   <div className="detail-price-info">
-                    <div className="detail-old-price">₺{selectedProduct.oldPrice.toFixed(2)}</div>
-                    <div className="detail-new-price">₺{selectedProduct.newPrice.toFixed(2)}</div>
+                    <div className="detail-old-price">
+                      ₺{(selectedProduct.oldPrice || selectedProduct.original_price || 0).toFixed(2)}
+                    </div>
+                    <div className="detail-new-price">
+                      ₺{(selectedProduct.newPrice || selectedProduct.discounted_price || 0).toFixed(2)}
+                    </div>
                     <div className="detail-discount-percentage">
-                      {Math.round((1 - selectedProduct.newPrice / selectedProduct.oldPrice) * 100)}% indirim
+                      {Math.round((1 - (selectedProduct.newPrice || selectedProduct.discounted_price || 0) / (selectedProduct.oldPrice || selectedProduct.original_price || 1)) * 100)}% indirim
                     </div>
                   </div>
                 </div>
                 
                 <div className="detail-saved-info">
-                  <FaLeaf /> {selectedProduct.savedCount} paket kurtarıldı
+                  <FaLeaf /> {selectedProduct.savedCount || selectedProduct.quantity_available || 0} paket mevcut
                 </div>
-                
+
                 <div className="detail-description">
                   <h3>Paket İçeriği</h3>
-                  <p>Bu paket restoran/market tarafından günün sonunda artan yemeklerden oluşturulmuştur. İçeriği günlük olarak değişmektedir. Gıda israfını önlemek için bu paketi ayırabilirsiniz.</p>
+                  <p>{
+                    selectedProduct.description || 
+                    'Bu paket restoran/market tarafından günün sonunda artan yemeklerden oluşturulmuştur. İçeriği günlük olarak değişmektedir. Gıda israfını önlemek için bu paketi ayırabilirsiniz.'
+                  }</p>
                 </div>
                 
                 <div className="detail-ratings">
@@ -1002,7 +1124,6 @@ const convertRealPackageToBusinessFormat = (packageData) => {
                 <button 
                   className="detail-reserve-button" 
                   onClick={() => addToCart(selectedProduct)}
-
                 >
                   Ürünü Kurtar
                 </button>

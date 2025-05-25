@@ -138,6 +138,32 @@ class AuthService {
     
     return null;
   }
+  getUserInfo() {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        return null;
+      }
+      
+      const user = JSON.parse(userStr);
+      console.log('AuthService.getUserInfo - Raw user:', user);
+      
+      // Kullanıcı verisini normalize et
+      const normalizedUser = {
+        ...user,
+        id: user.id || user.user_id || user.userId,
+        user_id: user.user_id || user.id || user.userId,
+        userId: user.userId || user.id || user.user_id
+      };
+      
+      console.log('AuthService.getUserInfo - Normalized user:', normalizedUser);
+      return normalizedUser;
+      
+    } catch (error) {
+      console.error('getUserInfo hatası:', error);
+      return null;
+    }
+  }
 
   /**
    * Kullanıcının oturum açıp açmadığını kontrol eder

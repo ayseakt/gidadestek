@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
-const Seller = require('./Seller');
 
 const User = sequelize.define('User', {
   user_id: { 
@@ -9,7 +8,7 @@ const User = sequelize.define('User', {
     autoIncrement: true 
   },
   email: { 
-    type: DataTypes.STRING(255), // Veritabanınızla uyumlu
+    type: DataTypes.STRING(255),
     unique: true, 
     allowNull: false, 
     validate: { isEmail: true } 
@@ -42,24 +41,39 @@ const User = sequelize.define('User', {
     allowNull: true,
     defaultValue: false
   }
-  // Veritabanınızda olmayan alanları kaldırdık:
-  // - email_verified
-  // - phone_verified  
-  // - two_factor_secret
-  // - updated_at
 }, {
   tableName: 'Users',
-  timestamps: false, // created_at'i manuel yönetiyoruz
-  underscored: false // veritabanı alan adları snake_case değil
+  timestamps: false,
+  underscored: false
 });
 
 // İlişkileri tanımlayalım
 User.associate = function(models) {
   // Seller ile ilişki
-  User.hasOne(models.Seller, { 
-    foreignKey: 'user_id',
-    as: 'seller'
-  });
+  if (models.Seller) {
+    User.hasOne(models.Seller, { 
+      foreignKey: 'user_id',
+      as: 'seller'
+    });
+  }
+  
+  // PaymentCard ile ilişki - SADECE MODEL VARSA KURULUYOR
+  if (models.PaymentCard) {
+    User.hasMany(models.PaymentCard, {
+      foreignKey: 'user_id',
+      as: 'paymentCards'
+    });
+    
+    // Varsayılan ödeme kartı için özel ilişki
+    User.hasOne(models.PaymentCard, {
+      foreignKey: 'user_id',
+      as: 'defaultPaymentCard',
+      scope: {
+        is_default: true,
+        is_active: true
+      }
+    });
+  }
   
   // Location ile ilişki (eğer varsa)
   if (models.Location) {
@@ -68,7 +82,6 @@ User.associate = function(models) {
       as: 'addresses'
     });
     
-    // Varsayılan adres için özel ilişki
     User.hasOne(models.Location, {
       foreignKey: 'user_id',
       as: 'defaultAddress',
