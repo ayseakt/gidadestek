@@ -28,7 +28,8 @@ export const CartProvider = ({ children }) => {
         return;
       }
 
-      const response = await fetch('/api/orders/my-orders', {
+      const backendUrl = process.env.REACT_APP_API_URL || 'http://localhost:5051';
+      const response = await fetch(`${backendUrl}/api/orders/my-orders`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`,
@@ -370,124 +371,156 @@ export const CartProvider = ({ children }) => {
   }, [loadCartFromBackend]);
 
   // ✅ Backend entegrasyonu ile sipariş oluşturma
-  const processPayment = useCallback(async (paymentData) => {
-    setIsLoading(true);
+// cartContext.js içindeki processPayment fonksiyonu - DEBUG VERSION
+const processPayment = useCallback(async (paymentData) => {
+  setIsLoading(true);
+  
+  try {
+    console.log('🔄 processPayment başlatıldı:', paymentData);
     
-    try {
-      // Sepeti doğrula
-      await validateCart();
-      
-      if (cartItems.length === 0) {
-        throw new Error('Sepetiniz boş');
-      }
-
-      // 1. Önce ödeme simülasyonunu çalıştır
-      const { PaymentSimulator } = await import('../utils/paymentSimulator');
-      const simulator = new PaymentSimulator();
-      
-      const simulationData = {
-        ...paymentData,
-        amount: cartTotal
-      };
-      
-      console.log('Ödeme simülasyonu başlatılıyor:', simulationData);
-      
-      const paymentResult = await simulator.processPayment(simulationData);
-      
-      // 2. Ödeme başarısızsa hemen dön
-      if (!paymentResult.success) {
-        return paymentResult;
-      }
-
-      // 3. Ödeme başarılıysa backend'e sipariş kaydet
-      const orderPayload = {
-        // Sipariş bilgileri
-        trackingNumber: paymentResult.trackingNumber,
-        totalAmount: parseFloat(paymentResult.totalAmount),
-        paymentMethod: paymentData.paymentMethod,
-        deliveryAddress: paymentData.deliveryAddress,
-        customerNotes: paymentData.customerNotes,
-        estimatedPickupTime: paymentData.estimatedPickupTime,
-        
-        // Sipariş kalemleri
-        items: cartItems.map(item => ({
-          package_id: item.id,
-          quantity: item.quantity,
-          unit_price: item.newPrice,
-          package_name: item.product,
-          seller_name: item.storeName
-        })),
-        
-        // Simülasyon bilgileri
-        isSimulation: true,
-        transactionId: paymentResult.transactionId,
-        confirmationCode: paymentResult.confirmationCode,
-        authorizationCode: paymentResult.authorizationCode,
-        
-        // Durum bilgisi
-        status: 'devam_ediyor',
-        estimatedReadyTime: paymentResult.estimatedReadyTime
-      };
-
-      console.log('Backend\'e sipariş gönderiliyor:', orderPayload);
-
-      // Backend'e sipariş gönder
-      const response = await fetch('/api/orders/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authService.getToken()}`
-        },
-        body: JSON.stringify(orderPayload)
-      });
-
-      const backendResult = await response.json();
-      console.log('Backend response:', backendResult);
-
-      if (!response.ok) {
-        throw new Error(backendResult.message || 'Sipariş backend\'e kaydedilemedi');
-      }
-
-      if (backendResult.success) {
-        // Sipariş başarıyla kaydedildi - sepeti temizle
-        await clearCart();
-        
-        // Sipariş geçmişini yenile
-        await loadOrderHistory();
-        
-        // Sipariş simülasyonunu başlat
-        startOrderSimulation(backendResult.orderId || paymentResult.orderId);
-        
-        return {
-          success: true,
-          orderId: backendResult.orderId || paymentResult.orderId,
-          trackingNumber: paymentResult.trackingNumber,
-          confirmationCode: paymentResult.confirmationCode,
-          totalAmount: paymentResult.totalAmount,
-          paymentMethod: paymentResult.paymentMethod,
-          transactionId: paymentResult.transactionId,
-          estimatedReadyTime: paymentResult.estimatedReadyTime,
-          message: backendResult.message || paymentResult.message
-        };
-      } else {
-        throw new Error(backendResult.message || 'Sipariş oluşturulamadı');
-      }
-
-    } catch (error) {
-      console.error('Ödeme işlemi hatası:', error);
-      return {
-        success: false,
-        message: error.message || 'Ödeme sırasında bir hata oluştu',
-        suggestions: [
-          'Lütfen tekrar deneyiniz',
-          'İnternet bağlantınızı kontrol edin',
-          'Farklı ödeme yöntemi deneyin'
-        ]
-      };
-    } finally {
-      setIsLoading(false);
+    // Sepeti doğrula
+    await validateCart();
+    
+    if (cartItems.length === 0) {
+      throw new Error('Sepetiniz boş');
     }
-  }, [cartItems, cartTotal, validateCart, clearCart, loadOrderHistory, startOrderSimulation]);
+
+    // 1. Önce ödeme simülasyonunu çalıştır
+    const { PaymentSimulator } = await import('../utils/paymentSimulator');
+    const simulator = new PaymentSimulator();
+    
+    const simulationData = {
+      ...paymentData,
+      amount: cartTotal
+    };
+    
+    console.log('💳 Ödeme simülasyonu başlatılıyor:', simulationData);
+    
+    const paymentResult = await simulator.processPayment(simulationData);
+    console.log('💳 Ödeme simülasyonu sonucu:', paymentResult);
+    
+    // 2. Ödeme başarısızsa hemen dön
+    if (!paymentResult.success) {
+      console.log('❌ Ödeme başarısız:', paymentResult.message);
+      return paymentResult;
+    }
+
+    // 3. Backend endpoint URL'sini doğrula
+    const backendUrl = process.env.REACT_APP_API_URL || 'http://localhost:5051';
+    const createOrderUrl = `${backendUrl}/api/orders/create`;
+    
+    console.log('🌐 Backend URL:', createOrderUrl);
+    console.log('🔑 Auth Token:', authService.getToken() ? 'Mevcut' : 'YOK!');
+
+    // 4. Order payload hazırla
+    const orderPayload = {
+      trackingNumber: paymentResult.trackingNumber,
+      totalAmount: parseFloat(paymentResult.totalAmount),
+      paymentMethod: paymentData.paymentMethod,
+      deliveryAddress: paymentData.deliveryAddress,
+      customerNotes: paymentData.customerNotes,
+      estimatedPickupTime: paymentData.estimatedPickupTime,
+      
+      items: cartItems.map(item => ({
+        package_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.newPrice,
+        package_name: item.product,
+        seller_name: item.storeName
+      })),
+      
+      isSimulation: true,
+      transactionId: paymentResult.transactionId,
+      confirmationCode: paymentResult.confirmationCode,
+      authorizationCode: paymentResult.authorizationCode,
+      status: 'pending',
+      estimatedReadyTime: paymentResult.estimatedReadyTime
+    };
+
+    console.log('📦 Order payload:', JSON.stringify(orderPayload, null, 2));
+
+    // 5. Backend'e sipariş gönder
+    console.log('🚀 Backend\'e istek gönderiliyor...');
+    
+    const response = await fetch(createOrderUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authService.getToken()}`
+      },
+      body: JSON.stringify(orderPayload)
+    });
+
+    console.log('📡 Response status:', response.status);
+    console.log('📡 Response headers:', Object.fromEntries([...response.headers.entries()]));
+
+    // 6. Response'u kontrol et
+    if (!response.ok) {
+      console.error('❌ HTTP Error:', response.status, response.statusText);
+      
+      // Response'un HTML mi JSON mi olduğunu kontrol et
+      const contentType = response.headers.get('content-type');
+      console.log('📄 Content-Type:', contentType);
+      
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        console.error('❌ JSON Error Data:', errorData);
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      } else {
+        // HTML response - muhtemelen 404 sayfası
+        const htmlText = await response.text();
+        console.error('❌ HTML Response (ilk 200 karakter):', htmlText.substring(0, 200));
+        throw new Error(`Endpoint bulunamadı: ${createOrderUrl} (${response.status})`);
+      }
+    }
+
+    // 7. Başarılı response'u parse et
+    const backendResult = await response.json();
+    console.log('✅ Backend success response:', backendResult);
+
+    if (backendResult.success) {
+      // Sipariş başarıyla kaydedildi
+      console.log('✅ Sipariş backend\'e kaydedildi, sepet temizleniyor...');
+      await clearCart();
+      
+      console.log('🔄 Sipariş geçmişi yenileniyor...');
+      await loadOrderHistory();
+      
+      console.log('⏰ Sipariş simülasyonu başlatılıyor...');
+      startOrderSimulation(backendResult.orderId || paymentResult.orderId);
+      
+      return {
+        success: true,
+        orderId: backendResult.orderId || paymentResult.orderId,
+        trackingNumber: paymentResult.trackingNumber,
+        confirmationCode: paymentResult.confirmationCode,
+        totalAmount: paymentResult.totalAmount,
+        paymentMethod: paymentResult.paymentMethod,
+        transactionId: paymentResult.transactionId,
+        estimatedReadyTime: paymentResult.estimatedReadyTime,
+        message: backendResult.message || paymentResult.message
+      };
+    } else {
+      throw new Error(backendResult.message || 'Sipariş oluşturulamadı');
+    }
+
+  } catch (error) {
+    console.error('❌ processPayment error:', error);
+    console.error('❌ Error stack:', error.stack);
+    
+    return {
+      success: false,
+      message: error.message || 'Ödeme sırasında bir hata oluştu',
+      suggestions: [
+        'Lütfen tekrar deneyiniz',
+        'İnternet bağlantınızı kontrol edin',
+        'Farklı ödeme yöntemi deneyin'
+      ]
+    };
+  } finally {
+    setIsLoading(false);
+  }
+}, [cartItems, cartTotal, validateCart, clearCart, loadOrderHistory, startOrderSimulation]);
 
   const cancelOrder = useCallback(async (orderId) => {
     try {

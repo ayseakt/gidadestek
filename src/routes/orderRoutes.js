@@ -1,33 +1,255 @@
-// routes/orderRoutes.js
+// routes/orderRoutes.js - UPDATED VERSION WITH INCOMING ORDERS
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const { Order, OrderItem, OrderStatusHistory, FoodPackage, Seller, User } = require('../models');
 
-// ✅ Sipariş oluşturma endpoint'i
+// ✅ YENİ: Satıcıya gelen siparişler endpoint'i
+router.get('/incoming-orders', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.user_id || req.user.id;
+    const { page = 1, limit = 20, status } = req.query;
+
+    console.log('📋 Satıcıya gelen siparişler getiriliyor:', { userId, page, limit, status });
+
+    // 1. Önce bu user'ın satıcı olup olmadığını kontrol et
+    const seller = await Seller.findOne({
+      where: { user_id: userId }
+    });
+
+    if (!seller) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu işlem için satıcı yetkisi gereklidir'
+      });
+    }
+
+    console.log('✅ Satıcı bulundu:', seller.seller_id);
+
+    // 2. Bu satıcıya ait siparişleri getir
+    const whereClause = { seller_id: seller.seller_id };
+    if (status && status !== 'all') {
+      whereClause.order_status = status;
+    }
+
+    const orders = await Order.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: OrderItem,
+          as: 'items',
+          include: [
+            {
+              model: FoodPackage,
+              as: 'package',
+              attributes: ['package_id', 'package_name', 'description', 'original_price', 'discounted_price', 'image_url']
+            }
+          ]
+        },
+        {
+          model: User,
+          as: 'customer', // Order model'inde customer ilişkisi tanımlanmalı
+          attributes: ['user_id', 'name', 'email', 'phone']
+        }
+      ],
+      order: [['order_date', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+
+    console.log(`✅ ${orders.count} sipariş bulundu`);
+
+    // 3. Frontend'in beklediği formata çevir
+    const formattedOrders = orders.rows.map(order => {
+      // İlk item'dan ürün bilgisini al (çoğu siparişte tek ürün olur)
+      const firstItem = order.items && order.items.length > 0 ? order.items[0] : null;
+      const packageInfo = firstItem?.package;
+
+      return {
+        id: order.order_id,
+        customerName: order.customer?.name || 'Müşteri',
+        customerPhone: order.customer?.phone || null,
+        productName: packageInfo?.package_name || 'Ürün',
+        description: packageInfo?.description || '',
+        price: parseFloat(order.total_amount),
+        orderDate: order.order_date,
+        pickupDate: order.pickup_date && order.pickup_time ? 
+          `${order.pickup_date}T${order.pickup_time}` : null,
+        address: order.delivery_address || 'Mağazadan alınacak',
+        status: mapBackendToFrontendStatus(order.order_status),
+        specialRequests: order.notes || null,
+        estimatedTime: calculateEstimatedTime(order.order_status, order.order_date),
+        confirmationCode: generateConfirmationCode(order.order_id),
+        lastUpdated: order.updated_at || order.order_date,
+        items: order.items?.map(item => ({
+          name: item.package?.package_name || 'Ürün',
+          quantity: item.quantity,
+          price: parseFloat(item.unit_price),
+          totalPrice: parseFloat(item.total_price)
+        })) || []
+      };
+    });
+
+    res.json({
+      success: true,
+      orders: formattedOrders,
+      totalCount: orders.count,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(orders.count / parseInt(limit))
+    });
+
+  } catch (error) {
+    console.error('❌ Gelen siparişler getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gelen siparişler getirilemedi',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// ✅ YENİ: Sipariş durumu güncelleme endpoint'i (satıcı için)
+router.patch('/:orderId/status', authMiddleware, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, reason, updatedBy } = req.body;
+    const userId = req.user.user_id || req.user.id;
+
+    console.log('🔄 Sipariş durumu güncelleniyor:', { orderId, status, reason, updatedBy });
+
+    // 1. Satıcı kontrolü
+    const seller = await Seller.findOne({
+      where: { user_id: userId }
+    });
+
+    if (!seller) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu işlem için satıcı yetkisi gereklidir'
+      });
+    }
+
+    // 2. Siparişi bul ve satıcının siparişi olduğunu kontrol et
+    const order = await Order.findOne({
+      where: {
+        order_id: orderId,
+        seller_id: seller.seller_id
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sipariş bulunamadı veya bu siparişe erişim yetkiniz yok'
+      });
+    }
+
+    // 3. Durum geçişinin geçerli olup olmadığını kontrol et
+    const validTransitions = {
+      'pending': ['confirmed', 'cancelled', 'rejected'],
+      'confirmed': ['preparing', 'cancelled'],
+      'preparing': ['ready', 'cancelled'],
+      'ready': ['completed', 'cancelled'],
+      'completed': [], // Tamamlanan sipariş değiştirilemez
+      'cancelled': [], // İptal edilen sipariş değiştirilemez
+      'rejected': [] // Reddedilen sipariş değiştirilemez
+    };
+
+    const frontendToBackendStatus = {
+      'yeni': 'pending',
+      'onaylandi': 'confirmed',
+      'hazirlaniyor': 'preparing',
+      'hazir': 'ready',
+      'teslim_edildi': 'completed',
+      'iptal_edildi': 'cancelled',
+      'reddedildi': 'rejected'
+    };
+
+    const backendStatus = frontendToBackendStatus[status] || status;
+    const currentStatus = order.order_status;
+
+    if (!validTransitions[currentStatus] || !validTransitions[currentStatus].includes(backendStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Sipariş durumu ${currentStatus}'dan ${backendStatus}'ya değiştirilemez`
+      });
+    }
+
+    // 4. Siparişi güncelle
+    const oldStatus = order.order_status;
+    await order.update({
+      order_status: backendStatus,
+      updated_at: new Date()
+    });
+
+    // 5. Durum geçmişi kaydet
+    await OrderStatusHistory.create({
+      order_id: orderId,
+      old_status: oldStatus,
+      new_status: backendStatus,
+      changed_by: userId,
+      notes: reason || `Satıcı tarafından ${status} olarak güncellendi`
+    });
+
+    // 6. OrderItem'ları da güncelle
+    await OrderItem.update(
+      { item_status: backendStatus },
+      { where: { order_id: orderId } }
+    );
+
+    console.log('✅ Sipariş durumu güncellendi:', { orderId, oldStatus, newStatus: backendStatus });
+
+    res.json({
+      success: true,
+      message: 'Sipariş durumu başarıyla güncellendi',
+      orderId: orderId,
+      oldStatus: mapBackendToFrontendStatus(oldStatus),
+      newStatus: status,
+      updatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('❌ Sipariş durum güncelleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sipariş durumu güncellenirken hata oluştu',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// ✅ Sipariş oluşturma endpoint'i - MODEL UYUMLU (ESKİ KOD)
 router.post('/create', authMiddleware, async (req, res) => {
   const transaction = await Order.sequelize.transaction();
   
   try {
     const { 
-      cartItems, 
+      trackingNumber,
       totalAmount, 
       paymentMethod, 
       deliveryAddress,
       customerNotes,
-      estimatedPickupTime 
+      estimatedPickupTime,
+      items,
+      isSimulation,
+      transactionId,
+      confirmationCode,
+      authorizationCode,
+      status,
+      estimatedReadyTime
     } = req.body;
 
-    const userId = req.user.id;
+    const userId = req.user.user_id || req.user.id;
 
     console.log('🛒 Sipariş oluşturma başladı:', {
       userId,
       totalAmount,
-      cartItemsCount: cartItems?.length || 0
+      itemsCount: items?.length || 0,
+      trackingNumber
     });
 
     // 1. Validasyonlar
-    if (!cartItems || cartItems.length === 0) {
+    if (!items || items.length === 0) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -43,21 +265,8 @@ router.post('/create', authMiddleware, async (req, res) => {
       });
     }
 
-    if (!estimatedPickupTime) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        message: 'Teslim alma zamanı giriniz'
-      });
-    }
-
-    // 2. Pickup date ve time'ı ayır
-    const pickupDateTime = new Date(estimatedPickupTime);
-    const pickupDate = pickupDateTime.toISOString().split('T')[0]; // YYYY-MM-DD
-    const pickupTime = pickupDateTime.toTimeString().split(' ')[0]; // HH:MM:SS
-
-    // 3. Seller ID'yi belirle (ilk ürünün seller'ı)
-    const firstPackage = await FoodPackage.findByPk(cartItems[0].package_id);
+    // 2. İlk paketten seller_id'yi al
+    const firstPackage = await FoodPackage.findByPk(items[0].package_id);
     if (!firstPackage) {
       await transaction.rollback();
       return res.status(404).json({
@@ -68,23 +277,36 @@ router.post('/create', authMiddleware, async (req, res) => {
 
     const sellerId = firstPackage.seller_id;
 
-    // 4. Ana siparişi oluştur
+    // 3. Pickup date ve time'ı ayır veya default değer oluştur
+    let pickupDate, pickupTime;
+    if (estimatedPickupTime) {
+      const pickupDateTime = new Date(estimatedPickupTime);
+      pickupDate = pickupDateTime.toISOString().split('T')[0];
+      pickupTime = pickupDateTime.toTimeString().split(' ')[0];
+    } else {
+      const defaultTime = new Date(Date.now() + 30 * 60 * 1000);
+      pickupDate = defaultTime.toISOString().split('T')[0];
+      pickupTime = defaultTime.toTimeString().split(' ')[0];
+    }
+
+    // 4. Order model'e uyumlu ana sipariş oluştur
     const order = await Order.create({
       user_id: userId,
       seller_id: sellerId,
       total_amount: totalAmount,
-      order_status: 'pending',
-      payment_status: 'pending',
+      order_status: 'pending', // Yeni siparişler pending olarak başlar
+      payment_status: 'completed',
       pickup_date: pickupDate,
       pickup_time: pickupTime,
-      notes: customerNotes || null
+      notes: customerNotes || null,
+      delivery_address: deliveryAddress || null
     }, { transaction });
 
     console.log('✅ Ana sipariş oluşturuldu:', order.order_id);
 
     // 5. Sipariş detaylarını oluştur
     const orderItems = [];
-    for (const item of cartItems) {
+    for (const item of items) {
       const packageInfo = await FoodPackage.findByPk(item.package_id);
       
       if (!packageInfo) {
@@ -92,28 +314,29 @@ router.post('/create', authMiddleware, async (req, res) => {
         continue;
       }
 
-      const unitPrice = parseFloat(packageInfo.new_price || packageInfo.price || 0);
+      const unitPrice = parseFloat(item.unit_price || packageInfo.discounted_price || packageInfo.original_price || 0);
       const quantity = parseInt(item.quantity || 1);
       const totalPrice = unitPrice * quantity;
 
       const orderItem = await OrderItem.create({
         order_id: order.order_id,
         package_id: item.package_id,
+        seller_id: packageInfo.seller_id,
         quantity: quantity,
         unit_price: unitPrice,
         total_price: totalPrice,
-        item_status: 'ordered'
+        pickup_code: Math.floor(100000 + Math.random() * 900000).toString()
       }, { transaction });
 
       orderItems.push(orderItem);
-      console.log(`✅ OrderItem oluşturuldu: ${orderItem.item_id} (Package: ${item.package_id})`);
+      console.log(`✅ OrderItem oluşturuldu: ${orderItem.order_item_id || 'ID pending'}`);
     }
 
     // 6. İlk durum geçmişi kaydı
     await OrderStatusHistory.create({
       order_id: order.order_id,
       old_status: null,
-      new_status: 'pending',
+      new_status: order.order_status,
       changed_by: userId,
       notes: 'Sipariş oluşturuldu'
     }, { transaction });
@@ -121,58 +344,22 @@ router.post('/create', authMiddleware, async (req, res) => {
     // 7. Transaction'ı commit et
     await transaction.commit();
 
-    // 8. Ödeme işlemini simüle et
-    let paymentSuccess = true;
-    let paymentMessage = 'Ödeme başarılı';
+    console.log('✅ Sipariş başarıyla oluşturuldu');
 
-    // Gerçek ödeme gateway entegrasyonu burada yapılacak
-    if (paymentMethod === 'card') {
-      // Kredi kartı işlemi
-      paymentSuccess = Math.random() > 0.1; // %90 başarı oranı
-    } else if (paymentMethod === 'paypal') {
-      // PayPal işlemi
-      paymentSuccess = Math.random() > 0.05; // %95 başarı oranı
-    }
-
-    // 9. Ödeme durumunu güncelle
-    if (paymentSuccess) {
-      await order.update({
-        payment_status: 'completed',
-        order_status: 'confirmed'
-      });
-
-      // Durum geçmişi güncelle
-      await OrderStatusHistory.create({
-        order_id: order.order_id,
-        old_status: 'pending',
-        new_status: 'confirmed',
-        changed_by: userId,
-        notes: 'Ödeme tamamlandı'
-      });
-
-      console.log('✅ Ödeme başarılı, sipariş onaylandı');
-    } else {
-      await order.update({
-        payment_status: 'failed',
-        order_status: 'cancelled'
-      });
-
-      paymentMessage = 'Ödeme işlemi başarısız oldu';
-      console.log('❌ Ödeme başarısız, sipariş iptal edildi');
-    }
-
-    // 10. Başarılı response
+    // 8. Response format
     res.status(201).json({
-      success: paymentSuccess,
-      message: paymentSuccess ? 'Siparişiniz başarıyla oluşturuldu' : paymentMessage,
+      success: true,
+      message: 'Siparişiniz başarıyla oluşturuldu',
       orderId: order.order_id,
-      trackingNumber: `SP${order.order_id.toString().padStart(6, '0')}`,
+      trackingNumber: trackingNumber || `TRK${order.order_id}${Date.now()}`,
       orderStatus: order.order_status,
       paymentStatus: order.payment_status,
       totalAmount: order.total_amount,
       pickupDate: order.pickup_date,
       pickupTime: order.pickup_time,
-      redirectUrl: '/orders' 
+      confirmationCode: confirmationCode,
+      transactionId: transactionId,
+      estimatedReadyTime: estimatedReadyTime
     });
 
   } catch (error) {
@@ -182,15 +369,16 @@ router.post('/create', authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Sipariş oluşturulurken hata oluştu',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
 
-// ✅ Kullanıcının siparişlerini getirme
+// ✅ Müşteri siparişleri endpoint'i (ESKİ KOD)
 router.get('/my-orders', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.user_id || req.user.id;
     const { page = 1, limit = 10, status } = req.query;
 
     console.log('📋 Siparişler getiriliyor:', { userId, page, limit, status });
@@ -210,14 +398,14 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
             {
               model: FoodPackage,
               as: 'package',
-              attributes: ['package_id', 'title', 'description', 'price', 'new_price', 'image_url']
+              attributes: ['package_id', 'package_name', 'description', 'original_price', 'discounted_price']
             }
           ]
         },
         {
           model: Seller,
           as: 'seller',
-          attributes: ['seller_id', 'store_name', 'phone', 'address']
+          attributes: ['seller_id', 'business_name']
         }
       ],
       order: [['order_date', 'DESC']],
@@ -225,20 +413,21 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
       offset: (parseInt(page) - 1) * parseInt(limit)
     });
 
-    // Veriyi frontend formatına dönüştür
     const formattedOrders = orders.rows.map(order => ({
       id: order.order_id,
-      storeName: order.seller?.store_name || 'Bilinmeyen Mağaza',
-      storeImage: 'https://via.placeholder.com/60', // Default image
-      productName: order.items?.length > 0 ? order.items[0].package.title : 'Ürün',
+      storeName: order.seller?.business_name || 'Bilinmeyen Mağaza',
+      storeImage: 'https://via.placeholder.com/60',
+      productName: order.items?.length > 0 ? order.items[0].package?.package_name : 'Ürün',
       orderDate: order.order_date,
       pickupDate: `${order.pickup_date}T${order.pickup_time}`,
       address: order.seller?.address || 'Adres bilgisi yok',
       price: parseFloat(order.total_amount),
-      originalPrice: parseFloat(order.total_amount) * 1.5, // Örnek indirim hesabı
-      status: mapOrderStatus(order.order_status),
+      originalPrice: parseFloat(order.total_amount) * 1.2,
+      status: mapBackendToFrontendStatus(order.order_status),
+      trackingNumber: `TRK${order.order_id}${Date.now()}`,
+      confirmationCode: Math.floor(100000 + Math.random() * 900000),
       items: order.items?.map(item => ({
-        name: item.package.title,
+        name: item.package?.package_name || 'Ürün',
         quantity: item.quantity,
         price: parseFloat(item.total_price)
       })) || []
@@ -262,11 +451,11 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Sipariş detayını getirme
+// Diğer endpoint'ler (ESKİ KOD)
 router.get('/:orderId', authMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.user_id || req.user.id;
 
     const order = await Order.findOne({
       where: {
@@ -318,12 +507,11 @@ router.get('/:orderId', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Sipariş iptal etme
 router.patch('/:orderId/cancel', authMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { reason } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.user_id || req.user.id;
 
     const order = await Order.findOne({
       where: {
@@ -339,7 +527,6 @@ router.patch('/:orderId/cancel', authMiddleware, async (req, res) => {
       });
     }
 
-    // Sadece pending veya confirmed siparişler iptal edilebilir
     if (!['pending', 'confirmed'].includes(order.order_status)) {
       return res.status(400).json({
         success: false,
@@ -349,19 +536,16 @@ router.patch('/:orderId/cancel', authMiddleware, async (req, res) => {
 
     const oldStatus = order.order_status;
 
-    // Siparişi iptal et
     await order.update({
       order_status: 'cancelled',
       cancellation_reason: reason || 'Kullanıcı tarafından iptal edildi'
     });
 
-    // Sipariş detaylarını da iptal et
     await OrderItem.update(
       { item_status: 'cancelled' },
       { where: { order_id: orderId } }
     );
 
-    // Durum geçmişi ekle
     await OrderStatusHistory.create({
       order_id: orderId,
       old_status: oldStatus,
@@ -385,17 +569,50 @@ router.patch('/:orderId/cancel', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Yardımcı fonksiyon: Order status'ları frontend formatına çevir
-function mapOrderStatus(backendStatus) {
+// ✅ YARDIMCI FONKSİYONLAR
+
+// Backend durumlarını frontend durumlarına çevirme
+function mapBackendToFrontendStatus(backendStatus) {
   const statusMap = {
-    'pending': 'devam_ediyor',
-    'confirmed': 'devam_ediyor',
+    'pending': 'yeni',
+    'confirmed': 'onaylandi',
+    'preparing': 'hazirlaniyor',
     'ready': 'hazir',
     'completed': 'teslim_edildi',
-    'cancelled': 'iptal_edildi'
+    'cancelled': 'iptal_edildi',
+    'rejected': 'reddedildi'
   };
   
-  return statusMap[backendStatus] || 'devam_ediyor';
+  return statusMap[backendStatus] || 'yeni';
+}
+
+// Tahmini süre hesaplama
+function calculateEstimatedTime(status, orderDate) {
+  switch (status) {
+    case 'pending':
+      return 15; // Onay bekliyor, tahmini 15 dk
+    case 'confirmed':
+      return 20; // Onaylandı, tahmini 20 dk
+    case 'preparing':
+      return 10; // Hazırlanıyor, tahmini 10 dk kaldı
+    case 'ready':
+      return 0; // Hazır
+    default:
+      return null;
+  }
+}
+
+// Onay kodu üretme
+function generateConfirmationCode(orderId) {
+  // OrderID'den 6 haneli kod üret
+  const seed = orderId.toString();
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString().substr(0, 6).padStart(6, '0');
 }
 
 module.exports = router;

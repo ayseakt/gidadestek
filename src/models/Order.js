@@ -1,4 +1,6 @@
 // models/Order.js
+const { DataTypes} = require('sequelize');
+const sequelize = require('../config/db');
 module.exports = (sequelize, DataTypes) => {
   const Order = sequelize.define('Order', {
     order_id: {

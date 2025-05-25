@@ -1,6 +1,7 @@
 {
   "name": "sofrapay-backend",
   "version": "1.0.0",
+  "proxy": "http://localhost:3001",
   "description": "SofraPay food sharing platform backend",
   "main": "src/server.js",
   "scripts": {
@@ -32,6 +33,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
-  },
-  "proxy": "http://localhost:5051"
+  }
+ 
 }

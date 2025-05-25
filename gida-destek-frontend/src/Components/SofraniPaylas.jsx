@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPlus, FaCamera, FaMapMarkerAlt, FaClock, FaChartBar, FaHistory, FaEdit, FaSave } from 'react-icons/fa';
+import { FaPlus, FaCamera, FaMapMarkerAlt, FaClock, FaChartBar, FaHistory, FaEdit, FaSave ,FaShoppingBag, FaCheck, FaTimes, FaEye, FaSearch} from 'react-icons/fa';
 import './SofraniPaylas.css';
 import api, { packageService, statisticsService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/AuthService';
 import locationService from '../services/locationService';
-
+import orderService from '../services/orderService'; 
 function SofraniPaylas() {
   // Düzenleme state'i eklendi
   const [editingPackage, setEditingPackage] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
-
+  const [siparisler, setSiparisler] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showOrderDetail, setShowOrderDetail] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   // Düzeltilmiş state tanımlamaları
   const [locations, setLocations] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
@@ -549,7 +553,136 @@ function SofraniPaylas() {
       }
     }
   };
+const refreshOrders = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    console.log('Siparişler yükleniyor...');
+    const response = await orderService.getMyOrders();
+    console.log('Siparişler API Response:', response);
+    
+    if (response && response.data) {
+      let ordersData = [];
+      
+      if (Array.isArray(response.data)) {
+        ordersData = response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        ordersData = response.data.data;
+      }
+      
+      setSiparisler(ordersData);
+      console.log('Yüklenen siparişler:', ordersData);
+      
+    } else {
+      setSiparisler([]);
+    }
+    
+  } catch (err) {
+    console.error("Siparişler yüklenirken hata:", err);
+    setError("Siparişler yüklenemedi.");
+    setSiparisler([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
+// 5. Teslimat kodu doğrulama fonksiyonu
+const handleVerifyCode = async (orderId) => {
+  if (!verificationCode.trim()) {
+    alert('Lütfen doğrulama kodunu girin.');
+    return;
+  }
+  
+  try {
+    setLoading(true);
+    
+    const response = await orderService.verifyDeliveryCode(orderId, verificationCode);
+    
+    if (response && response.data.success) {
+      // Sipariş durumunu güncelle
+      setSiparisler(prev => prev.map(order => 
+        order.id === orderId 
+          ? { ...order, status: 'completed', delivery_verified: true }
+          : order
+      ));
+      
+      alert('Teslimat başarıyla doğrulandı!');
+      setVerificationCode('');
+      setShowOrderDetail(false);
+      setSelectedOrder(null);
+      
+    } else {
+      alert('Geçersiz doğrulama kodu!');
+    }
+    
+  } catch (err) {
+    console.error('Kod doğrulama hatası:', err);
+    if (err.response?.status === 400) {
+      alert('Geçersiz doğrulama kodu!');
+    } else {
+      alert('Doğrulama sırasında bir hata oluştu.');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
+// 6. Sipariş hazır olarak işaretleme
+const handleMarkReady = async (orderId) => {
+  if (window.confirm('Bu siparişi hazır olarak işaretlemek istediğinizden emin misiniz?')) {
+    try {
+      setLoading(true);
+      
+      await orderService.markOrderReady(orderId);
+      
+      // State'i güncelle
+      setSiparisler(prev => prev.map(order => 
+        order.id === orderId 
+          ? { ...order, status: 'ready' }
+          : order
+      ));
+      
+      alert('Sipariş hazır olarak işaretlendi!');
+      
+    } catch (err) {
+      console.error('Sipariş güncelleme hatası:', err);
+      alert('Sipariş güncellenirken bir hata oluştu.');
+    } finally {
+      setLoading(false);
+    }
+  }
+};
+
+// 7. Sipariş detaylarını görüntüleme
+const handleShowOrderDetail = (order) => {
+  setSelectedOrder(order);
+  setShowOrderDetail(true);
+};
+
+// 8. Siparişleri filtreleme
+const filteredOrders = siparisler.filter(order => {
+  if (filterStatus === 'all') return true;
+  return order.status === filterStatus;
+});
+
+// 9. Sipariş durumu için renk ve metin döndürme
+const getOrderStatusInfo = (status) => {
+  switch (status) {
+    case 'pending':
+      return { text: 'Bekliyor', color: '#ffa500', bgColor: '#fff3cd' };
+    case 'confirmed':
+      return { text: 'Onaylandı', color: '#007bff', bgColor: '#cce7ff' };
+    case 'ready':
+      return { text: 'Hazır', color: '#28a745', bgColor: '#d4edda' };
+    case 'completed':
+      return { text: 'Teslim Edildi', color: '#6c757d', bgColor: '#e9ecef' };
+    case 'cancelled':
+      return { text: 'İptal Edildi', color: '#dc3545', bgColor: '#f8d7da' };
+    default:
+      return { text: 'Bilinmiyor', color: '#6c757d', bgColor: '#e9ecef' };
+  }
+};
   // Paket düzenleme - YENİ: Düzenleme modunu başlat
   const handleEditPackage = (paket) => {
     console.log('Düzenlenen paket:', paket);
@@ -976,6 +1109,12 @@ function SofraniPaylas() {
           onClick={() => setActiveTab('istatistikler')}
         >
           <FaChartBar /> İstatistikler
+        </div>
+        <div 
+          className={`tab ${activeTab === 'siparisler' ? 'active' : ''}`}
+          onClick={() => setActiveTab('siparisler')}
+        >
+          <FaShoppingBag /> Siparişler
         </div>
       </div>
 
@@ -1442,6 +1581,245 @@ function SofraniPaylas() {
             </div>
           </div>
         )}
+        {activeTab === 'siparisler' && (
+  <div className="siparisler">
+    <div className="siparisler-header">
+      <h2>Siparişlerim</h2>
+      
+      {/* Filtre ve Arama */}
+      <div className="siparis-controls">
+        <div className="filter-controls">
+          <select 
+            value={filterStatus} 
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="status-filter"
+          >
+            <option value="all">Tüm Siparişler</option>
+            <option value="pending">Bekleyen</option>
+            <option value="confirmed">Onaylanan</option>
+            <option value="ready">Hazır</option>
+            <option value="completed">Teslim Edilen</option>
+            <option value="cancelled">İptal Edilen</option>
+          </select>
+        </div>
+        
+        <button 
+          className="btn-secondary refresh-btn"
+          onClick={refreshOrders}
+          disabled={loading}
+        >
+          <FaSearch /> Yenile
+        </button>
+      </div>
+    </div>
+    
+    {/* Loading */}
+    {loading && (
+      <div className="loading-indicator">
+        <div className="spinner"></div>
+        <p>Siparişler yükleniyor...</p>
+      </div>
+    )}
+    
+    {/* Sipariş Listesi */}
+    {!loading && filteredOrders.length === 0 && (
+      <div className="no-orders">
+        <p>
+          {filterStatus === 'all' 
+            ? 'Siparişiniz bulunmamaktadır.' 
+            : `${getOrderStatusInfo(filterStatus).text} durumunda sipariş bulunmamaktadır.`
+          }
+        </p>
+      </div>
+    )}
+    
+    <div className="siparis-list">
+      {filteredOrders.map((siparis) => {
+        const statusInfo = getOrderStatusInfo(siparis.status);
+        
+        return (
+          <div key={siparis.id} className="siparis-card">
+            <div className="siparis-header">
+              <div className="siparis-info">
+                <h3>Sipariş #{siparis.order_number || siparis.id}</h3>
+                <span 
+                  className="status-badge"
+                  style={{ 
+                    color: statusInfo.color, 
+                    backgroundColor: statusInfo.bgColor 
+                  }}
+                >
+                  {statusInfo.text}
+                </span>
+              </div>
+              <div className="siparis-date">
+                {new Date(siparis.created_at).toLocaleDateString('tr-TR', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
+            </div>
+            
+            <div className="siparis-details">
+              <div className="customer-info">
+                <strong>Müşteri:</strong> {siparis.customer_name || 'Anonim'}
+              </div>
+              <div className="package-info">
+                <strong>Paket:</strong> {siparis.package_name}
+              </div>
+              <div className="price-info">
+                <strong>Tutar:</strong> ₺{parseFloat(siparis.total_amount || 0).toFixed(2)}
+              </div>
+              <div className="quantity-info">
+                <strong>Adet:</strong> {siparis.quantity}
+              </div>
+            </div>
+            
+            <div className="siparis-actions">
+              <button 
+                className="btn-outline"
+                onClick={() => handleShowOrderDetail(siparis)}
+              >
+                <FaEye /> Detay
+              </button>
+              
+              {siparis.status === 'confirmed' && (
+                <button 
+                  className="btn-success"
+                  onClick={() => handleMarkReady(siparis.id)}
+                  disabled={loading}
+                >
+                  <FaCheck /> Hazır İşaretle
+                </button>
+              )}
+              
+              {siparis.status === 'ready' && !siparis.delivery_verified && (
+                <button 
+                  className="btn-primary"
+                  onClick={() => handleShowOrderDetail(siparis)}
+                >
+                  <FaCheck /> Kodu Doğrula
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+    
+    {/* Sipariş Detay Modal */}
+    {showOrderDetail && selectedOrder && (
+      <div className="modal-overlay">
+        <div className="modal-content order-detail-modal">
+          <div className="modal-header">
+            <h3>Sipariş Detayı - #{selectedOrder.order_number || selectedOrder.id}</h3>
+            <button 
+              className="close-btn"
+              onClick={() => {
+                setShowOrderDetail(false);
+                setSelectedOrder(null);
+                setVerificationCode('');
+              }}
+            >
+              <FaTimes />
+            </button>
+          </div>
+          
+          <div className="modal-body">
+            <div className="order-info-grid">
+              <div className="info-section">
+                <h4>Sipariş Bilgileri</h4>
+                <div className="info-item">
+                  <span>Durum:</span>
+                  <span className="status-badge" style={{
+                    color: getOrderStatusInfo(selectedOrder.status).color,
+                    backgroundColor: getOrderStatusInfo(selectedOrder.status).bgColor
+                  }}>
+                    {getOrderStatusInfo(selectedOrder.status).text}
+                  </span>
+                </div>
+                <div className="info-item">
+                  <span>Sipariş Tarihi:</span>
+                  <span>{new Date(selectedOrder.created_at).toLocaleString('tr-TR')}</span>
+                </div>
+                <div className="info-item">
+                  <span>Paket:</span>
+                  <span>{selectedOrder.package_name}</span>
+                </div>
+                <div className="info-item">
+                  <span>Adet:</span>
+                  <span>{selectedOrder.quantity}</span>
+                </div>
+                <div className="info-item">
+                  <span>Tutar:</span>
+                  <span>₺{parseFloat(selectedOrder.total_amount || 0).toFixed(2)}</span>
+                </div>
+              </div>
+              
+              <div className="info-section">
+                <h4>Müşteri Bilgileri</h4>
+                <div className="info-item">
+                  <span>İsim:</span>
+                  <span>{selectedOrder.customer_name || 'Belirtilmemiş'}</span>
+                </div>
+                <div className="info-item">
+                  <span>Telefon:</span>
+                  <span>{selectedOrder.customer_phone || 'Belirtilmemiş'}</span>
+                </div>
+                <div className="info-item">
+                  <span>E-posta:</span>
+                  <span>{selectedOrder.customer_email || 'Belirtilmemiş'}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Teslimat Kodu Doğrulama */}
+            {selectedOrder.status === 'ready' && !selectedOrder.delivery_verified && (
+              <div className="verification-section">
+                <h4>Teslimat Doğrulama</h4>
+                <p>Müşteriden aldığınız 6 haneli doğrulama kodunu girin:</p>
+                <div className="verification-input">
+                  <input
+                    type="text"
+                    placeholder="Örn: 123456"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength="6"
+                    className="code-input"
+                  />
+                  <button 
+                    className="btn-primary verify-btn"
+                    onClick={() => handleVerifyCode(selectedOrder.id)}
+                    disabled={loading || verificationCode.length !== 6}
+                  >
+                    {loading ? 'Doğrulanıyor...' : 'Doğrula'}
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Teslim Edilmiş Bilgisi */}
+            {selectedOrder.delivery_verified && (
+              <div className="delivered-info">
+                <div className="success-message">
+                  <FaCheck /> Bu sipariş başarıyla teslim edilmiştir.
+                </div>
+                {selectedOrder.delivered_at && (
+                  <div className="delivery-time">
+                    Teslimat Zamanı: {new Date(selectedOrder.delivered_at).toLocaleString('tr-TR')}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+)}
       </div>
     </div>
   );
