@@ -1,29 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  FaChevronLeft, 
-  FaMapMarkerAlt, 
-  FaCalendarAlt, 
-  FaClock, 
-  FaCheckCircle, 
-  FaTimesCircle, 
-  FaHourglassHalf, 
-  FaSearch, 
-  FaFilter, 
-  FaReceipt, 
-  FaSpinner,
-  FaBell,
-  FaUser,
-  FaPhone,
-  FaCheck,
-  FaTimes,
-  FaPlay,
-  FaPause,
-  FaEye,
-  FaBoxOpen,
-  FaSortAmountDown
-} from 'react-icons/fa';
-import './IncomingOrders.css';
+import { FaChevronLeft, FaMapMarkerAlt,FaCalendarAlt, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch, FaFilter, 
+  FaReceipt, FaSpinner,FaBell,FaUser,FaPhone,FaCheck,FaTimes,FaPlay,FaPause,FaEye,FaBoxOpen,FaSortAmountDown} from 'react-icons/fa';
+import './ınComingOrder.css';
+
 
 function IncomingOrders() {
   const navigate = useNavigate();
@@ -40,61 +20,24 @@ function IncomingOrders() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState('newest'); // newest, oldest, price_high, price_low
   const [newOrdersCount, setNewOrdersCount] = useState(0);
+  const getConfirmationCode = async () => {
+    const res = await fetch('/api/generate-confirmation-code');
+    const data = await res.json();
+    return data.code;
+  };
 
   // Sipariş durumlarına göre renk ve ikon belirleme (satıcı perspektifi)
   const statusConfig = {
-    'yeni': { 
-      color: '#007bff', 
-      icon: <FaBell />, 
-      text: 'Yeni Sipariş',
-      bgColor: '#e3f2fd',
-      priority: 1
-    },
-    'onaylandi': { 
-      color: '#28a745', 
-      icon: <FaCheck />, 
-      text: 'Onaylandı',
-      bgColor: '#e8f5e9',
-      priority: 2
-    },
-    'hazirlaniyor': { 
-      color: '#ffc107', 
-      icon: <FaHourglassHalf />, 
-      text: 'Hazırlanıyor',
-      bgColor: '#fff8e1',
-      priority: 3
-    },
-    'hazir': { 
-      color: '#17a2b8', 
-      icon: <FaBoxOpen />, 
-      text: 'Hazır - Alınmayı Bekliyor',
-      bgColor: '#e0f7fa',
-      priority: 4
-    },
-    'teslim_edildi': { 
-      color: '#28a745', 
-      icon: <FaCheckCircle />, 
-      text: 'Teslim Edildi',
-      bgColor: '#e8f5e9',
-      priority: 5
-    },
-    'iptal_edildi': { 
-      color: '#dc3545', 
-      icon: <FaTimesCircle />, 
-      text: 'İptal Edildi',
-      bgColor: '#ffebee',
-      priority: 6
-    },
-    'reddedildi': { 
-      color: '#6c757d', 
-      icon: <FaTimes />, 
-      text: 'Reddedildi',
-      bgColor: '#f5f5f5',
-      priority: 7
+    'yeni': { color: '#007bff', icon: <FaBell />, text: 'Yeni Sipariş',bgColor: '#e3f2fd',priority: 1
+    },'onaylandi': { color: '#28a745', icon: <FaCheck />,text: 'Onaylandı',bgColor: '#e8f5e9',priority: 2
+    },'hazirlaniyor': { color: '#ffc107', icon: <FaHourglassHalf />, text: 'Hazırlanıyor',bgColor: '#fff8e1',priority: 3
+    },'hazir': { color: '#17a2b8', icon: <FaBoxOpen />, text: 'Hazır - Alınmayı Bekliyor',bgColor: '#e0f7fa',priority: 4
+    },'teslim_edildi': { color: '#28a745', icon: <FaCheckCircle />, text: 'Teslim Edildi',bgColor: '#e8f5e9',priority: 5
+    },'iptal_edildi': { color: '#dc3545', icon: <FaTimesCircle />, text: 'İptal Edildi',bgColor: '#ffebee',priority: 6
+    },'reddedildi': { color: '#6c757d', icon: <FaTimes />,text: 'Reddedildi',bgColor: '#f5f5f5',priority: 7
     }
   };
-
-  // Backend'den gelen siparişleri getir
+// Backend'den gelen siparişleri getir
   const fetchIncomingOrders = async (showLoader = true) => {
     try {
       if (showLoader) setLoading(true);
@@ -106,16 +49,13 @@ function IncomingOrders() {
         navigate('/login');
         return;
       }
-
       console.log('🔄 Gelen siparişler getiriliyor...');
-      
       const baseUrl = process.env.NODE_ENV === 'production' 
         ? '' 
         : 'http://localhost:5051';
       
       const apiUrl = `${baseUrl}/api/orders/incoming-orders`; // Satıcıya gelen siparişler
       console.log('📡 API URL:', apiUrl);
-
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
@@ -279,6 +219,12 @@ function IncomingOrders() {
   // Sipariş durumunu güncelleme
   const updateOrderStatus = async (orderId, newStatus, reason = '') => {
     try {
+      // Eğer teslim edildi durumuna geçiyorsak ve onay kodu kontrolü yapılmadıysa engelle
+      if (newStatus === 'teslim_edildi' && !reason.includes('Doğru onay kodu ile teslim edildi')) {
+        alert('❌ Güvenlik hatası: Teslim işlemi sadece doğru onay kodu ile yapılabilir!');
+        return;
+      }
+      
       const token = localStorage.getItem('token');
       const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5051';
       
@@ -291,7 +237,8 @@ function IncomingOrders() {
         body: JSON.stringify({
           status: newStatus,
           reason: reason,
-          updatedBy: 'seller' // Satıcı tarafından güncellendi
+          updatedBy: 'seller',
+          timestamp: new Date().toISOString() // Zaman damgası ekleyelim
         })
       });
 
@@ -306,7 +253,12 @@ function IncomingOrders() {
         // Local state'i güncelle
         const updatedOrders = orders.map(order => {
           if (order.id === orderId) {
-            return {...order, status: newStatus, lastUpdated: new Date().toISOString()};
+            return {
+              ...order, 
+              status: newStatus, 
+              lastUpdated: new Date().toISOString(),
+              deliveryReason: reason // Teslim nedenini de saklayalım
+            };
           }
           return order;
         });
@@ -314,12 +266,21 @@ function IncomingOrders() {
         setOrders(updatedOrders);
         
         if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder({...selectedOrder, status: newStatus, lastUpdated: new Date().toISOString()});
+          setSelectedOrder({
+            ...selectedOrder, 
+            status: newStatus, 
+            lastUpdated: new Date().toISOString(),
+            deliveryReason: reason
+          });
         }
         
-        // Başarı mesajı
-        const statusText = statusConfig[newStatus]?.text || newStatus;
-        alert(`Sipariş durumu "${statusText}" olarak güncellendi.`);
+        // Başarı mesajı (teslim edildi durumu için özel mesaj)
+        if (newStatus === 'teslim_edildi') {
+          console.log(`✅ Sipariş #${orderId} başarıyla teslim edildi. ${reason}`);
+        } else {
+          const statusText = statusConfig[newStatus]?.text || newStatus;
+          alert(`Sipariş durumu "${statusText}" olarak güncellendi.`);
+        }
         
       } else {
         throw new Error(data.message || 'Durum güncelleme başarısız');
@@ -330,13 +291,149 @@ function IncomingOrders() {
     }
   };
 
+
   // Sipariş onaylama
-  const acceptOrder = (orderId) => {
-    const estimatedTime = window.prompt('Tahmini hazırlanma süresi (dakika):', '15');
-    if (estimatedTime) {
-      updateOrderStatus(orderId, 'onaylandi', `Tahmini süre: ${estimatedTime} dakika`);
+// Mevcut acceptOrder fonksiyonunun yerine:
+const acceptOrder = async (orderId) => {
+  const estimatedTime = window.prompt('Tahmini hazırlanma süresi (dakika):', '15');
+  if (estimatedTime) {
+    try {
+      const token = localStorage.getItem('token');
+      const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5051';
+      
+      const response = await fetch(`${baseUrl}/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'onaylandi',
+          reason: `Tahmini süre: ${estimatedTime} dakika`,
+          updatedBy: 'seller'
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        const updatedOrders = orders.map(order => {
+          if (order.id === orderId) {
+            return data.order;
+          }
+          return order;
+        });
+        
+        setOrders(updatedOrders);
+        
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder(data.order);
+        }
+        
+        if (data.order.confirmationCode) {
+          alert(`✅ Sipariş onaylandı!\n🔐 Müşteri onay kodu: ${data.order.confirmationCode}\n⏱️ Tahmini süre: ${estimatedTime} dakika\n\n⚠️ Bu kodu müşteriye bildirin!`);
+        } else {
+          alert(`✅ Sipariş onaylandı!\n⏱️ Tahmini süre: ${estimatedTime} dakika`);
+        }
+        
+      } else {
+        throw new Error(data.message || 'Sipariş onaylama başarısız');
+      }
+    } catch (error) {
+      console.error('❌ Sipariş onaylama hatası:', error);
+      alert('Sipariş onaylanırken hata oluştu: ' + error.message);
     }
-  };
+  }
+};
+// deliverOrderSecure fonksiyonunu acceptOrder'dan sonra ekleyin:
+const deliverOrderSecure = async (orderId) => {
+  try {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) {
+      alert('❌ Sipariş bulunamadı!');
+      return;
+    }
+    
+    if (!order.confirmationCode) {
+      alert('❌ Bu siparişte onay kodu bulunmuyor. Lütfen önce siparişi onaylayın.');
+      return;
+    }
+    
+    if (order.status !== 'hazir') {
+      alert('❌ Bu sipariş henüz hazır durumda değil!');
+      return;
+    }
+    
+    const enteredCode = window.prompt(
+      `🔐 Müşterinin onay kodunu girin:\n\n` +
+      `📱 Müşteri bu kodu size söyleyecek.\n` +
+      `⚠️ Kod 6 haneli olmalıdır.`
+    );
+    
+    if (enteredCode === null) {
+      return;
+    }
+    
+    if (!enteredCode.trim()) {
+      alert('❌ Lütfen onay kodunu girin!');
+      return;
+    }
+    
+    if (enteredCode.trim().length !== 6) {
+      alert('❌ Onay kodu 6 haneli olmalıdır!');
+      return;
+    }
+    
+    const token = localStorage.getItem('token');
+    const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5051';
+    
+    const response = await fetch(`${baseUrl}/api/orders/${orderId}/verify-delivery`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        enteredCode: enteredCode.trim().toUpperCase()
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            status: 'teslim_edildi',
+            deliveredAt: new Date().toISOString()
+          };
+        }
+        return o;
+      });
+      
+      setOrders(updatedOrders);
+      
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder({
+          ...selectedOrder,
+          status: 'teslim_edildi',
+          deliveredAt: new Date().toISOString()
+        });
+        setShowOrderDetail(false);
+      }
+      
+      alert('✅ Sipariş başarıyla teslim edildi!\n🎉 Teşekkür ederiz.');
+      
+    } else {
+      alert(`❌ ${data.message}\n\n🔑 Girilen kod: "${enteredCode}"\n💡 Müşteriden doğru kodu isteyiniz.`);
+    }
+    
+  } catch (error) {
+    console.error('❌ Teslim etme hatası:', error);
+    alert('Teslim işlemi sırasında hata oluştu: ' + error.message);
+  }
+};
 
   // Sipariş reddetme
   const rejectOrder = (orderId) => {
@@ -360,12 +457,7 @@ function IncomingOrders() {
   };
 
   // Filtreleri temizleme
-  const clearFilters = () => {
-    setSearchTerm('');
-    setDateFilter('');
-    setStatusFilter('');
-    setSortBy('newest');
-    setShowFilters(false);
+  const clearFilters = () => {setSearchTerm('');setDateFilter('');setStatusFilter('');setSortBy('newest');setShowFilters(false);
   };
 
   // Durum rengi ve ikonu belirleme
@@ -432,23 +524,27 @@ function IncomingOrders() {
             </button>
           </div>
         );
-      case 'hazir':
-        return (
-          <div className="quick-actions">
-            <button 
-              className="quick-action-btn deliver"
-              onClick={(e) => {
-                e.stopPropagation();
-                const confirmCode = window.prompt('Müşterinin onay kodunu girin:');
-                if (confirmCode) {
-                  updateOrderStatus(order.id, 'teslim_edildi', `Onay kodu: ${confirmCode}`);
-                }
-              }}
-            >
-              <FaCheckCircle /> Teslim Et
-            </button>
-          </div>
-        );
+        case 'hazir':
+            return (
+              <div className="quick-actions">
+                <button 
+                  className="quick-action-btn deliver"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deliverOrderSecure(order.id);
+                  }}
+                >
+                  <FaCheckCircle /> Güvenli Teslim
+                </button>
+                
+                {order.confirmationCode && (
+                  <div className="confirmation-code-display ready">
+                    <span className="code-label">🔐 Beklenen Kod:</span>
+                    <span className="code-value highlighted">{order.confirmationCode}</span>
+                  </div>
+                )}
+              </div>
+            );
       default:
         return null;
     }
@@ -880,21 +976,18 @@ function IncomingOrders() {
                     <FaCheck /> Hazır Olarak İşaretle
                   </button>
                 )}
-                
-                {selectedOrder.status === 'hazir' && (
-                  <button 
-                    className="modal-action-btn deliver-btn"
-                    onClick={() => {
-                      const confirmCode = window.prompt('Müşterinin onay kodunu girin:');
-                      if (confirmCode) {
-                        updateOrderStatus(selectedOrder.id, 'teslim_edildi', `Onay kodu: ${confirmCode}`);
-                        setShowOrderDetail(false);
-                      }
-                    }}
-                  >
-                    <FaCheckCircle /> Teslim Et
-                  </button>
-                )}
+                                  
+                  {selectedOrder.status === 'hazir' && (
+                    <button 
+                      className="modal-action-btn deliver-btn"
+                      onClick={() => {
+                        deliverOrderSecure(selectedOrder.id);
+                      }}
+                    >
+                      <FaCheckCircle /> 🔐 Güvenli Teslim Et
+                    </button>
+                  )}
+
                 
                 <button 
                   className="modal-action-btn close-btn"

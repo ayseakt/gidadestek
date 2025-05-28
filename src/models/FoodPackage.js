@@ -113,7 +113,10 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'package_id',
       as: 'location'
     });
-
+    FoodPackage.hasOne(models.PackageLocation, {
+      foreignKey: 'package_id',
+      as: 'packageLocation'
+    });
     FoodPackage.belongsTo(models.Seller, {
       foreignKey: 'seller_id',
       as: 'seller'

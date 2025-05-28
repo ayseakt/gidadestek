@@ -112,6 +112,10 @@ const orderController = {
           user_id: req.user.user_id
         },
         include: [
+         {
+            model: User,
+            as: 'user' // ✅ DOĞRU: Order modelindeki alias ile aynı
+          },
           {
             model: Seller,
             as: 'seller',

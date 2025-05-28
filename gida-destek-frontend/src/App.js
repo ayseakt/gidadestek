@@ -12,6 +12,8 @@ import { CartProvider } from './contexts/cartContext';
 import { AuthProvider } from './context/authContext'; // ✅ EKLENDİ
 import './App.css';
 import SellerProfile from './Components/SellerProfile';
+import IncominOrder from './Components/InCominOrder';
+
 const MainScreen = ({ userData, onLogout }) => {
   return (
     <>
@@ -20,12 +22,13 @@ const MainScreen = ({ userData, onLogout }) => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/sofrani-paylas" element={<SofraniPaylas />} />
+          <Route path="/paketlerim" element={<IncominOrder />} />
           <Route path="/aldiklarim" element={<MyOrders />} />
           <Route path="/profil" element={<UserProfile userData={userData} />} />
           <Route path="/favoriler" element={<Favorites />} />
           <Route path="/odeme" element={<PaymentPage />} /> 
           <Route path="/giris" element={<Navigate to="/" replace />} />
-          <Route path="/seller-profile" element={<SellerProfile />} />
+          <Route path="/seller-profile" element={<SellerProfile />} />zz
         </Routes>
       </main>
       <footer className="footer">

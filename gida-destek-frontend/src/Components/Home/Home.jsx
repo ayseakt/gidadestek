@@ -2,33 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './Home.css';
 import DonationCard from './DonationCard';
 import locationService from '../../services/locationService'; // Bu import'u ekleyin
-import { 
-  FaUser, 
-  FaBell, 
-  FaHeart, 
-  FaRegHeart,
-  FaShoppingBag, 
-  FaMapMarkerAlt, 
-  FaClock, 
-  FaLeaf,
-  FaSearch,
-  FaTimes,
-  FaMap,
-  FaStore,
-  FaSmile,
-  FaPizzaSlice,
-  FaCalendarAlt,     // Yeni eklendi - Son tüketim tarihi için
-  FaCalendarCheck,  
-  FaBolt,
-  FaWindowClose,
-  FaFilter,
-  FaSortAmountDown,
-  FaShoppingCart,
-  FaPlus,
-  FaMinus,
-  FaTrash
-
-} from 'react-icons/fa';
+import { FaUser, FaBell, FaHeart, FaRegHeart,FaShoppingBag, FaMapMarkerAlt, FaClock, FaLeaf,FaSearch,FaTimes,FaMap,FaStore,FaSmile,FaPizzaSlice, FaCalendarAlt,FaCalendarCheck,  FaBolt,FaWindowClose,FaFilter,FaSortAmountDown,FaShoppingCart,FaPlus,FaMinus,FaTrash} from 'react-icons/fa';
 import FilterSidebar from './FilterSidebar';
 import packageService from '../../services/packageService';
 import cartService from '../../services/cartServices';
@@ -88,9 +62,6 @@ const formatTime = (timeString) => {
     return 'Belirtilmemiş';
   }
 };
-
-
-
 const formatDate = (dateString) => {
   if (!dateString) return 'Belirtilmemiş';
   try {
@@ -288,7 +259,6 @@ const handleAddToCart = async (business, quantity = 1) => {
       }
     }
 
-    // ⭐ FINAL VALIDATION
     if (typeof packageId !== 'number' || isNaN(packageId) || packageId <= 0) {
       console.error('❌ Final validation failed - Geçersiz packageId:', packageId, 'Type:', typeof packageId);
       alert('Geçersiz paket ID');
@@ -470,7 +440,6 @@ const handleAddToCart = async (business, quantity = 1) => {
       }
     });
   };
-
   // Kullanıcı konumunu al
 const getUserLocation = async () => {
   await getUserDefaultLocation();
@@ -496,8 +465,7 @@ const convertRealPackageToBusinessFormat = (packageData) => {
     console.warn('Geçersiz paket verisi:', packageData);
     return null;
   }
-
-  if (!packageData.package_id) {
+if (!packageData.package_id) {
     console.warn('Eksik package_id:', packageData);
     return null;
   }

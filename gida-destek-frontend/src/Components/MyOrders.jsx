@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaChevronLeft, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch, FaFilter, FaReceipt, FaSpinner } from 'react-icons/fa';
+import { FaChevronLeft, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch, FaFilter, FaReceipt, FaSpinner ,FaDirections} from 'react-icons/fa';
 import './MyOrders.css';
 
 function MyOrders() {
@@ -25,7 +25,47 @@ function MyOrders() {
   const navigateToOrders = () => {
     navigate('/orders');
   };
+  const getDirections = (address, event) => {
+    event.stopPropagation(); // Kartın tıklama olayını engellemek için
+    
+    if (!address) {
+      alert('Adres bilgisi bulunamadı');
+      return;
+    }
 
+    // Kullanıcının cihazını tespit et
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+    const isAndroid = /android/i.test(userAgent);
+
+    const encodedAddress = encodeURIComponent(address);
+
+    if (isIOS) {
+      // iOS için Apple Maps'i dene, yoksa Google Maps
+      const appleUrl = `maps://maps.apple.com/?daddr=${encodedAddress}`;
+      const googleUrl = `https://maps.google.com/maps?daddr=${encodedAddress}`;
+      
+      // Apple Maps'i aç, başarısız olursa Google Maps'e yönlendir
+      window.location.href = appleUrl;
+      setTimeout(() => {
+        window.open(googleUrl, '_blank');
+      }, 1500);
+    } else if (isAndroid) {
+      // Android için Google Maps uygulamasını dene
+      const googleAppUrl = `google.navigation:q=${encodedAddress}`;
+      const googleWebUrl = `https://maps.google.com/maps?daddr=${encodedAddress}`;
+      
+      try {
+        window.location.href = googleAppUrl;
+      } catch (e) {
+        window.open(googleWebUrl, '_blank');
+      }
+    } else {
+      // Desktop veya diğer cihazlar için web tarayıcısında Google Maps
+      const googleWebUrl = `https://maps.google.com/maps?daddr=${encodedAddress}`;
+      window.open(googleWebUrl, '_blank');
+    }
+  };
   // Sipariş durumlarına göre renk ve ikon belirleme
   const statusConfig = {
     'devam_ediyor': { color: '#ffc107', icon: <FaHourglassHalf />, text: 'Devam Ediyor' },
@@ -134,12 +174,31 @@ const fetchOrders = async (showLoader = true) => {
       throw new Error('Sunucu yanıtı JSON formatında değil');
     }
     
-    if (data.success) {
-      console.log('✅ Siparişler başarıyla getirildi:', data.orders);
-      setOrders(data.orders || []);
-      setFilteredOrders(data.orders || []);
-      setError(null);
-    } else {
+if (data.success) {
+  console.log('✅ Siparişler başarıyla getirildi:', data.orders);
+  
+  // Backend'den gelen veriyi frontend formatına çevir
+  const formattedOrders = (data.orders || []).map(order => ({
+    id: order.id,
+    storeName: order.storeName || 'Restoran Adı Yok',
+    productName: order.orderName || order.productName || 'Ürün Adı Yok',
+    price: parseFloat(order.totalPrice || order.price || order.amount || 0) || 0,
+    originalPrice: parseFloat(order.originalPrice || order.totalPrice || order.price || order.amount || 0) || 0,
+    orderDate: order.createdAt || order.orderDate || new Date().toISOString(),
+    pickupDate: order.pickupDate || order.createdAt || new Date().toISOString(),
+    status: order.status === 'yeni' ? 'devam_ediyor' : order.status,
+    address: order.address || 'Adres bilgisi yok',
+    confirmationCode: order.confirmationCode,
+    trackingNumber: order.orderNumber,
+    storeImage: order.storeImage || '/default-store.png',
+    items: order.items || [{ name: order.orderName || 'Ürün', quantity: 1, price: order.totalPrice || 0 }]
+  }));
+  
+  console.log('🔄 Formatlanmış siparişler:', formattedOrders);
+  setOrders(formattedOrders);
+  setFilteredOrders(formattedOrders);
+  setError(null);
+} else {
       throw new Error(data.message || 'Siparişler getirilemedi');
     }
   } catch (err) {
@@ -568,9 +627,9 @@ const fetchOrders = async (showLoader = true) => {
           {/* Orders list */}
           <div className="trendyol-orders-list">
             {filteredOrders.length > 0 ? (
-              filteredOrders.map((order) => (
+              filteredOrders.map((order, index) => (
                 <div 
-                  key={order.id} 
+                  key={`order-${order.id || index}`} 
                   className="trendyol-order-card"
                   onClick={() => handleOrderClick(order)}
                 >
@@ -621,6 +680,45 @@ const fetchOrders = async (showLoader = true) => {
                       )}
                       <p className="product-description">{order.productName}</p>
                     </div>
+                    {/* Yol Tarifi Butonu - Sadece hazır ve devam eden siparişler için */}
+                    {(order.status === 'hazir' || order.status === 'devam_ediyor') && order.address && (
+                      <div className="order-directions">
+                        <button
+                          onClick={(e) => getDirections(order.address, e)}
+                          className="directions-button"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            background: '#28a745',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            marginTop: '0.5rem'
+                          }}
+                        >
+                          <FaDirections />
+                          Yol Tarifi Al
+                        </button>
+                        <div style={{ 
+                          fontSize: '0.8rem', 
+                          color: '#666', 
+                          marginTop: '0.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          <FaMapMarkerAlt />
+                          {order.address?.length > 50 ? 
+                            order.address.substring(0, 50) + '...' : 
+                            order.address
+                          }
+                        </div>
+                      </div>
+                    )}                    
                   </div>
                 </div>
               ))
@@ -749,8 +847,8 @@ const fetchOrders = async (showLoader = true) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedOrder.items && selectedOrder.items.map((item, index) => (
-                      <tr key={index}>
+                    {selectedOrder.items && selectedOrder.items.map((item, idx) => (
+                      <tr key={`item-${idx}-${item.name || 'unnamed'}`}>
                         <td>{item.name}</td>
                         <td>{item.quantity}</td>
                         <td>{item.price?.toFixed(2)} TL</td>

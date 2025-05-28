@@ -1,8 +1,88 @@
-// routes/orderRoutes.js - UPDATED VERSION WITH INCOMING ORDERS
+// routes/orderRoutes.js - UPDATED VERSION WITH CONFIRMATION CODE LOGIC
+const { 
+  Order, 
+  OrderItem, 
+  OrderStatusHistory, 
+  FoodPackage, 
+  Seller, 
+  User, 
+  UserProfile, // ✅ EKLE
+  OrderLog, 
+  PackageLocation 
+} = require('../models');
+
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
-const { Order, OrderItem, OrderStatusHistory, FoodPackage, Seller, User } = require('../models');
+
+
+// ✅ YARDIMCI FONKSİYONLAR - EN ÜSTTE TANIMLANMIŞ
+
+// Benzersiz onay kodu oluşturma fonksiyonu
+async function ensureUniqueCode(OrderModel) {
+  let isUnique = false;
+  let confirmationCode;
+  
+  while (!isUnique) {
+    // 6 haneli rastgele kod oluştur (harfler ve rakamlar)
+    confirmationCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // Bu kodun daha önce kullanılıp kullanılmadığını kontrol et
+    const existingOrder = await OrderModel.findOne({
+      where: { confirmationCode: confirmationCode }
+    });
+    
+    if (!existingOrder) {
+      isUnique = true;
+    }
+  }
+  
+  return confirmationCode;
+}
+
+// Backend durumlarını frontend durumlarına çevirme
+function mapBackendToFrontendStatus(backendStatus) {
+  const statusMap = {
+    'pending': 'yeni',
+    'confirmed': 'onaylandi',
+    'preparing': 'hazirlaniyor',
+    'ready': 'hazir',
+    'completed': 'teslim_edildi',
+    'cancelled': 'iptal_edildi',
+    'rejected': 'reddedildi'
+  };
+  
+  return statusMap[backendStatus] || 'yeni';
+}
+
+// Tahmini süre hesaplama
+function calculateEstimatedTime(status, orderDate) {
+  switch (status) {
+    case 'pending':
+      return 15; // Onay bekliyor, tahmini 15 dk
+    case 'confirmed':
+      return 20; // Onaylandı, tahmini 20 dk
+    case 'preparing':
+      return 10; // Hazırlanıyor, tahmini 10 dk kaldı
+    case 'ready':
+      return 0; // Hazır
+    default:
+      return null;
+  }
+}
+
+// Onay kodu üretme (basit versiyon)
+function generateConfirmationCode(orderId) {
+  // OrderID'den 6 haneli kod üret
+  const seed = orderId.toString();
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString().substr(0, 6).padStart(6, '0');
+}
 
 // ✅ YENİ: Satıcıya gelen siparişler endpoint'i
 router.get('/incoming-orders', authMiddleware, async (req, res) => {
@@ -32,63 +112,83 @@ router.get('/incoming-orders', authMiddleware, async (req, res) => {
       whereClause.order_status = status;
     }
 
-    const orders = await Order.findAndCountAll({
-      where: whereClause,
+const orders = await Order.findAndCountAll({
+  where: whereClause,
+  include: [
+    {
+      model: OrderItem,
+      as: 'items',
       include: [
         {
-          model: OrderItem,
-          as: 'items',
+          model: FoodPackage,
+          as: 'package',
+          attributes: ['package_id', 'package_name', 'description', 'original_price', 'discounted_price', 'location_id'],
           include: [
             {
-              model: FoodPackage,
-              as: 'package',
-              attributes: ['package_id', 'package_name', 'description', 'original_price', 'discounted_price', 'image_url']
+              model: PackageLocation,
+              as: 'location',
+              attributes: ['address', 'latitude', 'longitude']
             }
           ]
-        },
-        {
-          model: User,
-          as: 'customer', // Order model'inde customer ilişkisi tanımlanmalı
-          attributes: ['user_id', 'name', 'email', 'phone']
         }
-      ],
-      order: [['order_date', 'DESC']],
-      limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit)
-    });
+      ]
+    },
+    {
+      model: User,
+      as: 'user',
+      attributes: ['user_id', 'email', 'phone_number'],
+      include: [
+        {
+          model: UserProfile,
+          as: 'UserProfile', // ✅ DEĞİŞTİRİLDİ: 'profile' -> 'UserProfile'
+          attributes: [ 'first_name', 'last_name']
+        }
+      ]
+    }
+  ],
+  order: [['order_date', 'DESC']],
+  limit: parseInt(limit),
+  offset: (parseInt(page) - 1) * parseInt(limit)
+});
+
 
     console.log(`✅ ${orders.count} sipariş bulundu`);
 
     // 3. Frontend'in beklediği formata çevir
-    const formattedOrders = orders.rows.map(order => {
-      // İlk item'dan ürün bilgisini al (çoğu siparişte tek ürün olur)
-      const firstItem = order.items && order.items.length > 0 ? order.items[0] : null;
-      const packageInfo = firstItem?.package;
+const formattedOrders = orders.rows.map(order => {
+  const firstItem = order.items?.[0];
+  const packageInfo = firstItem?.package;
 
-      return {
-        id: order.order_id,
-        customerName: order.customer?.name || 'Müşteri',
-        customerPhone: order.customer?.phone || null,
-        productName: packageInfo?.package_name || 'Ürün',
-        description: packageInfo?.description || '',
-        price: parseFloat(order.total_amount),
-        orderDate: order.order_date,
-        pickupDate: order.pickup_date && order.pickup_time ? 
-          `${order.pickup_date}T${order.pickup_time}` : null,
-        address: order.delivery_address || 'Mağazadan alınacak',
-        status: mapBackendToFrontendStatus(order.order_status),
-        specialRequests: order.notes || null,
-        estimatedTime: calculateEstimatedTime(order.order_status, order.order_date),
-        confirmationCode: generateConfirmationCode(order.order_id),
-        lastUpdated: order.updated_at || order.order_date,
-        items: order.items?.map(item => ({
-          name: item.package?.package_name || 'Ürün',
-          quantity: item.quantity,
-          price: parseFloat(item.unit_price),
-          totalPrice: parseFloat(item.total_price)
-        })) || []
-      };
-    });
+  // ✅ DÜZELTİLDİ: UserProfile alias'ı değiştirildi
+  const userName = order.user?.UserProfile?.name || 
+                   (order.user?.UserProfile?.first_name && order.user?.UserProfile?.last_name 
+                     ? `${order.user.UserProfile.first_name} ${order.user.UserProfile.last_name}`
+                     : order.user?.email?.split('@')[0] || 'Müşteri');
+
+  return {
+    id: order.order_id,
+    UserName: userName,
+    UserPhone: order.user?.phone_number || null,
+    productName: packageInfo?.package_name || 'Ürün',
+    description: packageInfo?.description || '',
+    price: parseFloat(order.total_amount),
+    orderDate: order.order_date,
+    pickupDate: order.pickup_date && order.pickup_time ? 
+      `${order.pickup_date}T${order.pickup_time}` : null,
+    address: firstItem?.package?.location?.address || order.delivery_address || 'Mağazadan alınacak',
+    status: mapBackendToFrontendStatus(order.order_status),
+    specialRequests: order.notes || null,
+    estimatedTime: calculateEstimatedTime(order.order_status, order.order_date),
+    confirmationCode: order.confirmationCode || null,
+    lastUpdated: order.updated_at || order.order_date,
+    items: order.items?.map(item => ({
+      name: item.package?.package_name || 'Ürün',
+      quantity: item.quantity,
+      price: parseFloat(item.unit_price),
+      totalPrice: parseFloat(item.total_price)
+    })) || []
+  };
+});
 
     res.json({
       success: true,
@@ -108,7 +208,7 @@ router.get('/incoming-orders', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ YENİ: Sipariş durumu güncelleme endpoint'i (satıcı için)
+// ✅ GÜNCELLENEN: Sipariş durumu güncelleme endpoint'i (ONAY KODU LOGİĞİ İLE)
 router.patch('/:orderId/status', authMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -130,12 +230,31 @@ router.patch('/:orderId/status', authMiddleware, async (req, res) => {
     }
 
     // 2. Siparişi bul ve satıcının siparişi olduğunu kontrol et
-    const order = await Order.findOne({
-      where: {
-        order_id: orderId,
-        seller_id: seller.seller_id
-      }
-    });
+const order = await Order.findOne({
+  where: {
+    order_id: orderId,
+    seller_id: seller.seller_id
+  },
+  include: [
+    {
+      model: User,
+      as: 'user',
+      attributes: ['user_id', 'phone_number'],
+      include: [
+        {
+          model: UserProfile,
+          as: 'UserProfile', // ✅ DEĞİŞTİRİLDİ: 'profile' -> 'UserProfile'
+          attributes: [ 'first_name', 'last_name']
+        }
+      ]
+    },
+    {
+      model: Seller,
+      as: 'seller',
+      attributes: ['seller_id', 'business_name']
+    }
+  ]
+});
 
     if (!order) {
       return res.status(404).json({
@@ -175,12 +294,37 @@ router.patch('/:orderId/status', authMiddleware, async (req, res) => {
       });
     }
 
-    // 4. Siparişi güncelle
-    const oldStatus = order.order_status;
-    await order.update({
+    // 🔑 ONAY KODU OLUŞTURMA LOGİĞİ (İLK DOSYADAN)
+    let updateData = {
       order_status: backendStatus,
       updated_at: new Date()
-    });
+    };
+
+    // Sipariş onaylandığında onay kodu oluştur
+    if (backendStatus === 'confirmed' && !order.confirmationCode) {
+      const confirmationCode = await ensureUniqueCode(Order);
+      updateData.confirmationCode = confirmationCode;
+      updateData.codeGeneratedAt = new Date();
+      
+      console.log(`🔐 Sipariş #${orderId} için onay kodu oluşturuldu: ${confirmationCode}`);
+    }
+
+    // Teslim edildi durumunda doğrulama
+    if (backendStatus === 'completed') {
+      if (!order.confirmationCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu siparişte onay kodu bulunmuyor'
+        });
+      }
+      
+      updateData.deliveredAt = new Date();
+      updateData.deliveredBy = userId;
+    }
+
+    // 4. Siparişi güncelle
+    const oldStatus = order.order_status;
+    await order.update(updateData);
 
     // 5. Durum geçmişi kaydet
     await OrderStatusHistory.create({
@@ -197,14 +341,24 @@ router.patch('/:orderId/status', authMiddleware, async (req, res) => {
       { where: { order_id: orderId } }
     );
 
+    // 7. Güncellenen siparişi yeniden getir
+    const updatedOrder = await Order.findByPk(orderId, {
+      include: [
+        { model: User, as: 'user', attributes: ['user_id',  'phone_number'] },
+        { model: Seller, as: 'seller', attributes: ['seller_id', 'business_name'] }
+      ]
+    });
+
     console.log('✅ Sipariş durumu güncellendi:', { orderId, oldStatus, newStatus: backendStatus });
 
     res.json({
       success: true,
       message: 'Sipariş durumu başarıyla güncellendi',
+      order: updatedOrder,
       orderId: orderId,
       oldStatus: mapBackendToFrontendStatus(oldStatus),
       newStatus: status,
+      confirmationCode: updatedOrder.confirmationCode,
       updatedAt: new Date()
     });
 
@@ -214,6 +368,126 @@ router.patch('/:orderId/status', authMiddleware, async (req, res) => {
       success: false,
       message: 'Sipariş durumu güncellenirken hata oluştu',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// ✅ YENİ: Onay kodu ile teslim doğrulama endpoint'i (İLK DOSYADAN)
+router.post('/:orderId/verify-delivery', authMiddleware, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { enteredCode } = req.body;
+    const userId = req.user.user_id || req.user.id;
+
+    console.log('🔍 Teslim doğrulama:', { orderId, enteredCode });
+
+    // Satıcı kontrolü
+    const seller = await Seller.findOne({
+      where: { user_id: userId }
+    });
+
+    if (!seller) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu işlem için satıcı yetkisi gereklidir'
+      });
+    }
+
+    const order = await Order.findOne({
+      where: {
+        order_id: orderId,
+        seller_id: seller.seller_id
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sipariş bulunamadı'
+      });
+    }
+
+    if (order.order_status !== 'ready') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu sipariş henüz hazır durumda değil'
+      });
+    }
+
+    // Onay kodu doğrulama
+    if (enteredCode.trim().toUpperCase() !== order.confirmationCode.toUpperCase()) {
+      // Başarısız denemeyi logla (eğer OrderLog modeli varsa)
+      try {
+        await OrderLog.create({
+          orderId: orderId,
+          action: 'DELIVERY_ATTEMPT_FAILED',
+          details: {
+            enteredCode: enteredCode,
+            expectedCode: order.confirmationCode,
+            attemptedBy: userId,
+            timestamp: new Date()
+          }
+        });
+      } catch (logError) {
+        console.warn('⚠️ OrderLog kayıt edilemedi:', logError.message);
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Onay kodu yanlış'
+      });
+    }
+
+    // Başarılı teslim
+    await order.update({
+      order_status: 'completed',
+      deliveredAt: new Date(),
+      deliveredBy: userId
+    });
+
+    // OrderItem'ları da güncelle
+    await OrderItem.update(
+      { item_status: 'completed' },
+      { where: { order_id: orderId } }
+    );
+
+    // Durum geçmişi kaydet
+    await OrderStatusHistory.create({
+      order_id: orderId,
+      old_status: 'ready',
+      new_status: 'completed',
+      changed_by: userId,
+      notes: 'Onay kodu ile teslim edildi'
+    });
+
+    // Başarılı teslimi logla (eğer OrderLog modeli varsa)
+    try {
+      await OrderLog.create({
+        orderId: orderId,
+        action: 'DELIVERED_SUCCESSFULLY',
+        details: {
+          confirmationCode: order.confirmationCode,
+          deliveredBy: userId,
+          deliveredAt: new Date()
+        }
+      });
+    } catch (logError) {
+      console.warn('⚠️ OrderLog kayıt edilemedi:', logError.message);
+    }
+
+    console.log('✅ Sipariş başarıyla teslim edildi:', orderId);
+
+    res.json({
+      success: true,
+      message: 'Sipariş başarıyla teslim edildi',
+      order: order
+    });
+
+  } catch (error) {
+    console.error('❌ Teslim doğrulama hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 });
@@ -228,7 +502,7 @@ router.post('/create', authMiddleware, async (req, res) => {
       totalAmount, 
       paymentMethod, 
       deliveryAddress,
-      customerNotes,
+      UserNotes,
       estimatedPickupTime,
       items,
       isSimulation,
@@ -298,7 +572,7 @@ router.post('/create', authMiddleware, async (req, res) => {
       payment_status: 'completed',
       pickup_date: pickupDate,
       pickup_time: pickupTime,
-      notes: customerNotes || null,
+      notes: UserNotes || null,
       delivery_address: deliveryAddress || null
     }, { transaction });
 
@@ -375,82 +649,287 @@ router.post('/create', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Müşteri siparişleri endpoint'i (ESKİ KOD)
+  // ✅ Müşteri siparişleri endpoint'i (ESKİ KOD)
+// ✅ DÜZELTİLMİŞ: Müşteri siparişleri endpoint'i
 router.get('/my-orders', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.user_id || req.user.id;
     const { page = 1, limit = 10, status } = req.query;
 
-    console.log('📋 Siparişler getiriliyor:', { userId, page, limit, status });
+    console.log('🚀 Müşteri siparişleri getiriliyor:', { userId, page, limit, status });
 
+    // User ID kontrol
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Kullanıcı kimliği bulunamadı' 
+      });
+    }
+
+    // Where clause oluştur
     const whereClause = { user_id: userId };
     if (status && status !== 'all') {
       whereClause.order_status = status;
     }
 
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // ✅ ÖNCE BASIT SORGU - DEBUG İÇİN
+    console.log('🔍 Debug: Basit sorgu yapılıyor...');
+    const simpleTest = await Order.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: OrderItem,
+          as: 'items',
+          required: false,
+          include: [
+            {
+              model: FoodPackage, 
+              as: 'package',
+              required: false,
+              attributes: ['package_id', 'package_name', 'description', 'original_price', 'discounted_price']
+            }
+          ]
+        }
+      ],
+      limit: 3,
+      logging: console.log // SQL'i göster
+    });
+
+    console.log('🔍 Basit test sonuç:', {
+      count: simpleTest.length,
+      firstOrderItems: simpleTest[0]?.items?.length || 0,
+      firstPackage: simpleTest[0]?.items?.[0]?.package ? {
+        id: simpleTest[0].items[0].package.package_id,
+        name: simpleTest[0].items[0].package.package_name,
+        price: simpleTest[0].items[0].package.discounted_price
+      } : 'PACKAGE NULL'
+    });
+
+    // ✅ ASIL SORGU - PackageLocation olmadan önce deneyelim
     const orders = await Order.findAndCountAll({
       where: whereClause,
       include: [
         {
           model: OrderItem,
           as: 'items',
+          required: false,
           include: [
             {
-              model: FoodPackage,
+              model: FoodPackage, 
               as: 'package',
-              attributes: ['package_id', 'package_name', 'description', 'original_price', 'discounted_price']
+              required: false,
+              attributes: [
+                'package_id', 
+                'package_name', 
+                'description', 
+                'original_price', 
+                'discounted_price',
+                'location_id'
+              ]
+              // PackageLocation'ı geçici olarak kaldırdık
             }
           ]
         },
-        {
-          model: Seller,
+        { 
+          model: Seller, 
           as: 'seller',
-          attributes: ['seller_id', 'business_name']
+          required: false,
+          attributes: ['seller_id', 'business_name', 'phone_number']
         }
       ],
-      order: [['order_date', 'DESC']],
       limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit)
+      offset: offset,
+      order: [['order_date', 'DESC']]
     });
 
-    const formattedOrders = orders.rows.map(order => ({
-      id: order.order_id,
-      storeName: order.seller?.business_name || 'Bilinmeyen Mağaza',
-      storeImage: 'https://via.placeholder.com/60',
-      productName: order.items?.length > 0 ? order.items[0].package?.package_name : 'Ürün',
-      orderDate: order.order_date,
-      pickupDate: `${order.pickup_date}T${order.pickup_time}`,
-      address: order.seller?.address || 'Adres bilgisi yok',
-      price: parseFloat(order.total_amount),
-      originalPrice: parseFloat(order.total_amount) * 1.2,
-      status: mapBackendToFrontendStatus(order.order_status),
-      trackingNumber: `TRK${order.order_id}${Date.now()}`,
-      confirmationCode: Math.floor(100000 + Math.random() * 900000),
-      items: order.items?.map(item => ({
-        name: item.package?.package_name || 'Ürün',
-        quantity: item.quantity,
-        price: parseFloat(item.total_price)
-      })) || []
-    }));
+    console.log(`📦 ${orders.count} sipariş bulundu`);
+    
+    // ✅ DETAYLI DEBUG
+    if (orders.rows.length > 0) {
+      const firstOrder = orders.rows[0];
+      console.log('🔍 İlk sipariş detayı:', {
+        orderId: firstOrder.order_id,
+        itemsCount: firstOrder.items?.length || 0,
+        firstItem: firstOrder.items?.[0] ? {
+          packageId: firstOrder.items[0].package_id,
+          packageExists: !!firstOrder.items[0].package,
+          packageName: firstOrder.items[0].package?.package_name || 'NULL',
+          unitPrice: firstOrder.items[0].unit_price,
+          totalPrice: firstOrder.items[0].total_price,
+          quantity: firstOrder.items[0].quantity
+        } : 'NO ITEMS'
+      });
+    }
 
-    res.json({
+    // ✅ DÜZELTİLMİŞ: Frontend'in beklediği format - DAHA DETAYLI
+    const formattedOrders = orders.rows.map(order => {
+      // Items kontrolü
+      console.log(`🔍 Order ${order.order_id} formatlanıyor:`, {
+        itemsLength: order.items?.length || 0,
+        hasItems: !!(order.items && order.items.length > 0)
+      });
+
+      // İlk item'ı al (sipariş ismi için)
+      const firstItem = order.items?.[0];
+      const packageInfo = firstItem?.package;
+      
+      // Her item için debug
+      if (order.items) {
+        order.items.forEach((item, index) => {
+          console.log(`  📦 Item ${index}:`, {
+            packageId: item.package_id,
+            hasPackage: !!item.package,
+            packageName: item.package?.package_name || 'NULL',
+            unitPrice: item.unit_price,
+            totalPrice: item.total_price,
+            quantity: item.quantity
+          });
+        });
+      }
+
+      // Adres bilgisini al - Geçici olarak basit
+      const address = order.delivery_address || 'Mağazadan alınacak';
+
+      // Sipariş durumunu frontend formatına çevir
+      const frontendStatus = mapBackendToFrontendStatus(order.order_status);
+
+      const formattedOrder = {
+        // ✅ SİPARİŞ NUMARASI
+        orderId: order.order_id,
+        orderNumber: `SP${order.order_id.toString().padStart(6, '0')}`,
+        
+        // ✅ SİPARİŞ İSMİ - NULL kontrolü ile
+        orderName: (() => {
+          if (!order.items || order.items.length === 0) {
+            return 'Ürün bilgisi bulunamadı';
+          }
+          
+          const firstName = packageInfo?.package_name;
+          if (!firstName) {
+            return 'Ürün adı bulunamadı';
+          }
+          
+          return order.items.length === 1 
+            ? firstName
+            : `${firstName} ve ${order.items.length - 1} diğer ürün`;
+        })(),
+
+        // ✅ ADRES BİLGİSİ
+        address: address,
+        pickupAddress: address,
+        
+        // ✅ SİPARİŞ DURUMU
+        status: frontendStatus,
+        statusText: getStatusText(frontendStatus),
+        
+        // ✅ FİYAT BİLGİLERİ - Daha güvenli
+        totalAmount: parseFloat(order.total_amount || 0),
+        formattedPrice: `${parseFloat(order.total_amount || 0).toFixed(2)} ₺`,
+        
+        // Diğer bilgiler
+        seller: order.seller?.business_name || 'Satıcı Bulunamadı',
+        sellerPhone: order.seller?.phone_number || null,
+        orderDate: order.order_date || order.createdAt,
+        pickupDate: order.pickup_date,
+        pickupTime: order.pickup_time,
+        estimatedTime: calculateEstimatedTime(order.order_status, order.order_date),
+        confirmationCode: order.confirmationCode || null,
+        
+        // ✅ ITEMS DETAYİ - NULL kontrolü ile
+        items: order.items?.map(item => {
+          const unitPrice = parseFloat(item.unit_price || 0);
+          const quantity = parseInt(item.quantity || 1);
+          const totalPrice = parseFloat(item.total_price || unitPrice * quantity);
+          
+          return {
+            packageId: item.package_id,
+            packageName: item.package?.package_name || `Ürün #${item.package_id}`,
+            description: item.package?.description || '',
+            quantity: quantity,
+            unitPrice: unitPrice,
+            totalPrice: totalPrice,
+            formattedUnitPrice: `${unitPrice.toFixed(2)} ₺`,
+            formattedTotalPrice: `${totalPrice.toFixed(2)} ₺`,
+            originalPrice: parseFloat(item.package?.original_price || 0),
+            discountedPrice: parseFloat(item.package?.discounted_price || unitPrice),
+            hasDiscount: item.package?.original_price && item.package?.discounted_price && 
+                        parseFloat(item.package.original_price) > parseFloat(item.package.discounted_price)
+          };
+        }) || [],
+        
+        itemsCount: order.items?.length || 0,
+        lastUpdated: order.updated_at || order.order_date
+      };
+
+      console.log(`✅ Order ${order.order_id} formatlandı:`, {
+        orderName: formattedOrder.orderName,
+        totalAmount: formattedOrder.totalAmount,
+        itemsCount: formattedOrder.itemsCount,
+        firstItemName: formattedOrder.items[0]?.packageName || 'NONE'
+      });
+
+      return formattedOrder;
+    });
+
+    console.log('✅ Formatlanmış siparişler hazır:', {
+      ordersCount: formattedOrders.length,
+      firstOrder: formattedOrders[0] ? {
+        orderNumber: formattedOrders[0].orderNumber,
+        orderName: formattedOrders[0].orderName,
+        address: formattedOrders[0].address,
+        status: formattedOrders[0].status
+      } : null
+    });
+
+    return res.json({
       success: true,
       orders: formattedOrders,
       totalCount: orders.count,
       currentPage: parseInt(page),
-      totalPages: Math.ceil(orders.count / parseInt(limit))
+      totalPages: Math.ceil(orders.count / parseInt(limit)),
+      message: orders.count === 0 ? 'Henüz siparişiniz bulunmuyor' : null
     });
 
   } catch (error) {
-    console.error('❌ Siparişler getirme hatası:', error);
-    res.status(500).json({
+    console.error('❌ Müşteri siparişleri hatası:', error);
+    
+    return res.status(500).json({
       success: false,
       message: 'Siparişler getirilemedi',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
+// ✅ YARDIMCI FONKSİYON: Durum metinleri
+function getStatusText(status) {
+  const statusTexts = {
+    'yeni': 'Yeni Sipariş',
+    'onaylandi': 'Onaylandı',
+    'hazirlaniyor': 'Hazırlanıyor',
+    'hazir': 'Hazır',
+    'teslim_edildi': 'Teslim Edildi',
+    'iptal_edildi': 'İptal Edildi',
+    'reddedildi': 'Reddedildi'
+  };
+  
+  return statusTexts[status] || 'Bilinmeyen Durum';
+}
+function getStatusText(status) {
+  const statusTexts = {
+    'yeni': 'Yeni Sipariş',
+    'onaylandi': 'Onaylandı',
+    'hazirlaniyor': 'Hazırlanıyor',
+    'hazir': 'Hazır',
+    'teslim_edildi': 'Teslim Edildi',
+    'iptal_edildi': 'İptal Edildi',
+    'reddedildi': 'Reddedildi'
+  };
+  
+  return statusTexts[status] || 'Bilinmeyen Durum';
+}
 // Diğer endpoint'ler (ESKİ KOD)
 router.get('/:orderId', authMiddleware, async (req, res) => {
   try {
@@ -568,51 +1047,5 @@ router.patch('/:orderId/cancel', authMiddleware, async (req, res) => {
     });
   }
 });
-
-// ✅ YARDIMCI FONKSİYONLAR
-
-// Backend durumlarını frontend durumlarına çevirme
-function mapBackendToFrontendStatus(backendStatus) {
-  const statusMap = {
-    'pending': 'yeni',
-    'confirmed': 'onaylandi',
-    'preparing': 'hazirlaniyor',
-    'ready': 'hazir',
-    'completed': 'teslim_edildi',
-    'cancelled': 'iptal_edildi',
-    'rejected': 'reddedildi'
-  };
-  
-  return statusMap[backendStatus] || 'yeni';
-}
-
-// Tahmini süre hesaplama
-function calculateEstimatedTime(status, orderDate) {
-  switch (status) {
-    case 'pending':
-      return 15; // Onay bekliyor, tahmini 15 dk
-    case 'confirmed':
-      return 20; // Onaylandı, tahmini 20 dk
-    case 'preparing':
-      return 10; // Hazırlanıyor, tahmini 10 dk kaldı
-    case 'ready':
-      return 0; // Hazır
-    default:
-      return null;
-  }
-}
-
-// Onay kodu üretme
-function generateConfirmationCode(orderId) {
-  // OrderID'den 6 haneli kod üret
-  const seed = orderId.toString();
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash).toString().substr(0, 6).padStart(6, '0');
-}
 
 module.exports = router;
