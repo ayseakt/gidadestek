@@ -346,7 +346,7 @@ useEffect(() => {
     <>
       {/* Header Ana Bileşeni - Scroll durumuna göre sınıf adı değişir */}
       <div className={`header fixed-header ${isScrolled ? 'scrolled' : ''}`}>
-        <div className="logo-container" onClick={() => navigate('/')}>
+        <div className="logo-container" onClick={() => navigate(isDonorMode ? '/sofrani-paylas' : '/')}>
           <div className="logo">
             <FaLeaf /> {/* Logo ikonu olarak leaf kullanıldı, değiştirebilirsiniz */}
           </div>
