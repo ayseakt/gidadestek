@@ -128,7 +128,14 @@ module.exports = (sequelize, DataTypes) => {
         as: 'category'
       });
     }
+    FoodPackage.hasMany(models.PackageImage, {
+      foreignKey: 'package_id',
+      as: 'images', // ✨ Bunu kullanarak `include: [{ model: PackageImage, as: 'images' }]` yapabileceksin
+      onDelete: 'CASCADE'
+    });
   };
+
+
 
   return FoodPackage;
 };

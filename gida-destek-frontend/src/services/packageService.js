@@ -6,9 +6,9 @@ const packageService = {
    * Yeni bir paket oluşturur
    */
   createPackage: (packageData) => {
-    return api.post('/packages', packageData);
+    return api.post('/packages/create', packageData); // '/create' ekleyin
   },
-    
+      
   /**
    * Aktif paketleri getirir
    */

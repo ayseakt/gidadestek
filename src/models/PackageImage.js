@@ -39,5 +39,11 @@ const PackageImage = sequelize.define('PackageImage', {
   tableName: 'package_images',
   timestamps: false
 });
+PackageImage.associate = function(models) {
+  PackageImage.belongsTo(models.FoodPackage, {
+    foreignKey: 'package_id',
+    as: 'package'
+  });
+};
 
 module.exports = PackageImage;

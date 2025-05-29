@@ -61,7 +61,7 @@ function SofraniPaylas() {
     description: '',
     category_id: '',
     imageFile: null,
-    photos: []
+    images: []
   });
 
   // Google Maps API yükleme fonksiyonu
@@ -304,16 +304,15 @@ function SofraniPaylas() {
   };
 
   // Fotoğraf yükleme
-  const handlePhotoUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const firstFile = files[0];
-    
-    setFormData(prev => ({
-      ...prev,
-      imageFile: firstFile,
-      photos: files
-    }));
-  };
+const handlePhotoUpload = (e) => {
+  const files = Array.from(e.target.files);
+  setFormData(prev => ({
+    ...prev,
+    photos: files,
+    imageFile: files[0] // Geriye dönük uyumluluk için
+  }));
+};
+
 
   // Formu sıfırlama fonksiyonu
   const resetForm = () => {
@@ -327,7 +326,7 @@ function SofraniPaylas() {
       description: '',
       category_id: '',
       imageFile: null,
-      photos: []
+      images: []
     });
     
     setLocationData({
@@ -344,185 +343,119 @@ function SofraniPaylas() {
   };
 
   // Form submit - Yeni paket oluşturma veya düzenleme
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      // Gerekli alanları kontrol et
-      const requiredFields = [
-        'package_name', 
-        'original_price', 
-        'discounted_price', 
-        'pickup_end_time', 
-        'category_id'
-      ];
-      
-      if (!availableFrom) {
-        throw new Error('Lütfen Geçerlilik Başlangıç Tarihi alanını doldurun.');
-      }
-      if (!availableUntil) {
-        throw new Error('Lütfen Geçerlilik Bitiş Tarihi alanını doldurun.');
-      }
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
 
-      const missingFields = requiredFields.filter(field => !formData[field]);
+  try {
+    const requiredFields = [
+      'package_name', 
+      'original_price', 
+      'discounted_price', 
+      'pickup_end_time', 
+      'category_id'
+    ];
+
+    const missingFields = requiredFields.filter(field => !formData[field]);
+    if (missingFields.length > 0) {
+      throw new Error('Lütfen tüm zorunlu alanları doldurun.');
+    }
+
+    if (!availableFrom || !availableUntil) {
+      throw new Error('Geçerlilik tarihlerini doldurun.');
+    }
+
+    // ✅ GÜNCELLEME MODU KONTROLÜ
+    if (editingPackage && editingPackage.package_id) {
+      // 🔄 GÜNCELLEME İŞLEMİ - Sadece temel bilgiler
+      const updateData = {
+        package_name: formData.package_name,
+        original_price: formData.original_price,
+        discounted_price: formData.discounted_price,
+        quantity_available: formData.quantity_available || 1,
+        pickup_start_time: formData.pickup_start_time,
+        pickup_end_time: formData.pickup_end_time,
+        description: formData.description,
+        category_id: formData.category_id,
+        available_from: availableFrom,
+        available_until: availableUntil
+      };
+
+      console.log("🔄 Paket güncelleniyor:", editingPackage.package_id);
+      console.log("📤 Gönderilen data:", updateData);
+
+      const response = await packageService.updatePackage(editingPackage.package_id, updateData);
+      console.log("✅ Güncellenen paket:", response.data);
       
-      if (missingFields.length > 0) {
-        const fieldNames = {
-          'package_name': 'Paket Adı',
-          'original_price': 'Orijinal Fiyat',
-          'discounted_price': 'İndirimli Fiyat',
-          'pickup_end_time': 'Son Teslim Zamanı',
-          'category_id': 'Kategori',
-        };
-        
-        const missingFieldNames = missingFields.map(field => fieldNames[field] || field).join(', ');
-        throw new Error(`Lütfen aşağıdaki zorunlu alanları doldurun: ${missingFieldNames}`);
-      }
+      alert("Paket başarıyla güncellendi!");
       
-      // Konum kontrolü
-      const hasManualLocation = locationData.latitude && locationData.longitude && locationData.address;
-      const hasSelectedLocation = selectedLocationId && selectedLocationId !== "null" && selectedLocationId !== "";
-      
-      if (!hasManualLocation && !hasSelectedLocation) {
-        throw new Error('Lütfen bir konum seçin veya haritadan manuel konum belirleyin.');
-      }
-      
-      // FormData oluştur
+    } else {
+      // ➕ YENİ PAKET OLUŞTURMA İŞLEMİ
       const packageData = new FormData();
-        
-      // Paket temel bilgilerini FormData'ya ekle
       packageData.append('package_name', formData.package_name);
       packageData.append('original_price', formData.original_price);
       packageData.append('discounted_price', formData.discounted_price);
       packageData.append('quantity_available', formData.quantity_available || 1);
+      packageData.append('pickup_start_time', formData.pickup_start_time);
+      packageData.append('pickup_end_time', formData.pickup_end_time);
+      packageData.append('description', formData.description);
+      packageData.append('category_id', formData.category_id);
       packageData.append('available_from', availableFrom);
       packageData.append('available_until', availableUntil);
-      
-      function toMySQLDateTime(dateString) {
-        if (!dateString) return '';
-        const d = new Date(dateString);
-        // Geçersiz tarih kontrolü
-        if (isNaN(d.getTime())) return '';
-        
-        const pad = n => n.toString().padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-      }
-      // Tarih doğrulaması yap
-          if (formData.pickup_start_time && formData.pickup_end_time) {
-            const startTime = new Date(formData.pickup_start_time);
-            const endTime = new Date(formData.pickup_end_time);
-            
-            if (endTime <= startTime) {
-              throw new Error('Bitiş saati başlangıç saatinden sonra olmalıdır!');
-            }
-          }
-            
-      packageData.append('pickup_start_time', toMySQLDateTime(formData.pickup_start_time));
-      packageData.append('pickup_end_time', toMySQLDateTime(formData.pickup_end_time));
-      packageData.append('description', formData.description || '');
-      packageData.append('category_id', formData.category_id);
-      
-      // Konum bilgileri
-      if (hasManualLocation) {
+
+      // Konum bilgisi
+      if (locationData.latitude && locationData.longitude && locationData.address) {
         packageData.append('latitude', locationData.latitude);
         packageData.append('longitude', locationData.longitude);
         packageData.append('address', locationData.address);
-      }
-      
-      if (hasSelectedLocation) {
+      } else if (selectedLocationId) {
         packageData.append('location_id', selectedLocationId);
-      }
-      
-      // Fotoğraf ekleme
-      if (formData.imageFile) {
-        packageData.append('images', formData.imageFile);
-      }
-
-      // Debug için
-      console.log("Paket verileri:");
-      for (let [key, value] of packageData.entries()) {
-        console.log(`${key}: ${value}`);
-      }
-
-      let response;
-      
-      if (isEditMode && editingPackage) {
-        // Paket güncelleme
-        console.log('Paket güncelleniyor, ID:', editingPackage.id || editingPackage.package_id);
-        response = await packageService.updatePackage(editingPackage.id || editingPackage.package_id, packageData);
-        
-        // State'i güncelle - response'dan gelen güncel veriyi kullan
-        if (response && response.data) {
-          const updatedPackage = response.data;
-          
-          setPaketlerim(prev => prev.map(paket => {
-            const paketId = paket.id || paket.package_id;
-            const editingId = editingPackage.id || editingPackage.package_id;
-            
-            if (paketId === editingId) {
-              return { 
-                ...paket, 
-                ...updatedPackage,
-                // Değişiklik yapılan alanları özellikle güncelle
-                package_name: updatedPackage.package_name || formData.package_name,
-                original_price: updatedPackage.original_price || formData.original_price,
-                discounted_price: updatedPackage.discounted_price || formData.discounted_price,
-                quantity_available: updatedPackage.quantity_available || formData.quantity_available,
-                description: updatedPackage.description || formData.description,
-                pickup_start_time: updatedPackage.pickup_start_time || formData.pickup_start_time,
-                pickup_end_time: updatedPackage.pickup_end_time || formData.pickup_end_time,
-                available_from: updatedPackage.available_from || availableFrom,
-                available_until: updatedPackage.available_until || availableUntil
-              };
-            }
-            return paket;
-          }));
-          
-          // Güncelleme sonrası paketleri tekrar yükle
-          setTimeout(() => {
-            refreshPackages();
-          }, 1000);
-        }
-        
-        console.log("Paket başarıyla güncellendi:", response);
-        alert('Paket başarıyla güncellendi!');
-        
-      }else {
-        // Yeni paket oluşturma
-        response = await packageService.createPackage(packageData);
-        console.log("Başarılı yanıt:", response);
-        
-        if (response && response.data) {
-          setPaketlerim(prev => [response.data, ...prev]);
-          console.log("Yeni paket başarıyla oluşturuldu:", response);
-          alert('Paket başarıyla oluşturuldu!');
-        } else {
-          throw new Error("Sunucu yanıtı beklenmeyen formatta");
-        }
-      }
-      
-      // Formu sıfırla ve aktif paketler sekmesine geç
-      resetForm();
-      setActiveTab('aktifpaketler');
-
-    } catch (err) {
-      console.error("Paket işlemi sırasında hata:", err);
-
-      if (err.response && err.response.data) {
-        setError(`Hata: ${err.response.data.message || 'Bilinmeyen hata'}`);
       } else {
-        setError(`${err.message}`);
+        throw new Error('Konum bilgisi eksik.');
       }
 
-      if (err.response?.status === 401) {
-        setError("Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.");
-        setIsAuthenticated(false);
+      // Fotoğrafları ekle (sadece yeni paket için)
+      if (formData.photos && formData.photos.length > 0) {
+        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+
+        formData.photos.forEach(file => {
+          if (!validTypes.includes(file.type)) {
+            throw new Error(`Geçersiz dosya tipi: ${file.name}`);
+          }
+          if (file.size > maxSize) {
+            throw new Error(`Dosya çok büyük: ${file.name}`);
+          }
+          packageData.append('images', file);
+        });
+      } else {
+        throw new Error("En az bir resim seçmelisiniz.");
       }
-    } finally {
-      setLoading(false);
+
+      console.log("➕ Yeni paket oluşturuluyor...");
+      
+      // Debug için form içeriğini yazdır
+      for (let [key, val] of packageData.entries()) {
+        console.log(`${key}:`, val);
+      }
+
+      const response = await packageService.createPackage(packageData);
+      console.log("✅ Oluşturulan paket:", response.data);
+      
+      alert("Paket başarıyla oluşturuldu!");
     }
-  };
+
+    // İşlem tamamlandığında formu temizle ve aktif paketler sekmesine git
+    resetForm();
+    setActiveTab('aktifpaketler');
+    
+  } catch (err) {
+    console.error("🚨 Hata:", err);
+    alert(err.message || 'Bir hata oluştu.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Paket iptal etme
   const handleCancelPackage = async (paketId) => {
@@ -728,7 +661,7 @@ const getOrderStatusInfo = (status) => {
       description: paket.description || paket.aciklama || paket.icerik || '',
       category_id: paket.category_id || paket.kategori_id || '',
       imageFile: null,
-      photos: []
+      images: []
     };
     
     console.log('Form data being set:', newFormData);
@@ -1064,62 +997,72 @@ const getOrderStatusInfo = (status) => {
   return (
     <div className="sofrani-paylas-container">
       {/* İstatistik Kartları */}
-      <div className="host-stats-container">
-        <div className="stat-card">
-          <div className="stat-value">{istatistikler.toplamPaket || 0}</div>
-          <div className="stat-label">Toplam Paket</div>
+      <div className="dashboard-layout">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="sidebar-header">
+         
+          <span className="subtitle">Yönetim Paneli</span>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{istatistikler.kurtarilanYemek || 0}</div>
-          <div className="stat-label">Kurtarılan Porsiyon</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">₺{(istatistikler.kazanilanTutar || 0).toFixed(2)}</div>
-          <div className="stat-label">Kazanılan Tutar</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{istatistikler.azaltilanCO2 || 0} kg</div>
-          <div className="stat-label">Azaltılan CO₂</div>
-        </div>
-      </div>
-
-
-      {/* Sekmeler */}
-      <div className="host-tabs">
-        <div 
-          className={`tab ${activeTab === 'paketolustur' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('paketolustur')}
-        >
-          <FaPlus /> Paket Oluştur
-        </div>
-        <div 
-          className={`tab ${activeTab === 'aktifpaketler' ? 'active' : ''}`}
-          onClick={() => setActiveTab('aktifpaketler')}
-        >
-          <FaClock /> Aktif Paketler
-        </div>
-        <div 
-          className={`tab ${activeTab === 'gecmis' ? 'active' : ''}`}
-          onClick={() => setActiveTab('gecmis')}
-        >
-          <FaHistory /> Geçmiş
-        </div>
-        <div 
-          className={`tab ${activeTab === 'istatistikler' ? 'active' : ''}`}
-          onClick={() => setActiveTab('istatistikler')}
-        >
-          <FaChartBar /> İstatistikler
-        </div>
-        <div 
-          className={`tab ${activeTab === 'siparisler' ? 'active' : ''}`}
-          onClick={() => setActiveTab('siparisler')}
-        >
-          <FaShoppingBag /> Siparişler
+        
+        <nav className="sidebar-nav">
+          <div 
+            className={`nav-item ${activeTab === 'paketolustur' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('paketolustur')}
+          >
+            <FaPlus className="nav-icon" />
+            <span>Paket Oluştur</span>
+          </div>
+          <div 
+            className={`nav-item ${activeTab === 'aktifpaketler' ? 'active' : ''}`}
+            onClick={() => setActiveTab('aktifpaketler')}
+          >
+            <FaClock className="nav-icon" />
+            <span>Aktif Paketler</span>
+            {paketlerim.length > 0 && (
+              <span className="badge">{paketlerim.length}</span>
+            )}
+          </div>
+          <div 
+            className={`nav-item ${activeTab === 'gecmis' ? 'active' : ''}`}
+            onClick={() => setActiveTab('gecmis')}
+          >
+            <FaHistory className="nav-icon" />
+            <span>Geçmiş Paketler</span>
+          </div>
+          <div 
+            className={`nav-item ${activeTab === 'istatistikler' ? 'active' : ''}`}
+            onClick={() => setActiveTab('istatistikler')}
+          >
+            <FaChartBar className="nav-icon" />
+            <span>İstatistikler</span>
+          </div>
+        </nav>
+        
+        <div className="sidebar-stats">
+          <div className="stats-title">Özet İstatistikler</div>
+          <div className="mini-stat">
+            <span className="mini-stat-value">{istatistikler.toplamPaket || 0}</span>
+            <span className="mini-stat-label">Toplam Paket</span>
+          </div>
+          <div className="mini-stat">
+            <span className="mini-stat-value">{istatistikler.kurtarilanYemek || 0}</span>
+            <span className="mini-stat-label">Kurtarılan</span>
+          </div>
+          <div className="mini-stat">
+            <span className="mini-stat-value">₺{(istatistikler.kazanilanTutar || 0).toFixed(0)}</span>
+            <span className="mini-stat-label">Kazanç</span>
+          </div>
+          <div className="mini-stat">
+            <span className="mini-stat-value">{istatistikler.azaltilanCO2 || 0}kg</span>
+            <span className="mini-stat-label">CO₂ Azaltıldı</span>
+          </div>
         </div>
       </div>
 
       {/* Sekme İçerikleri */}
-      <div className="tab-content">
+      <div className="main-content">
+        <div className="content-wrapper">
         {error && <ErrorMessage message={error} />}
         
         {activeTab === 'paketolustur' && (
@@ -1212,29 +1155,33 @@ const getOrderStatusInfo = (status) => {
                 ></textarea>
               </div>
               
-              <div className="form-group">
+              <div className="form-group"> 
                 <label>Fotoğraf Ekle</label>
                 <div className="photo-upload">
-                  <input 
+                  <input  
                     type="file" 
-                    name="photos"
+                    id="photo-upload"                     // ✅ id eklendi
+                    name="images"
                     onChange={handlePhotoUpload}
                     multiple
                     accept="image/*"
-                    id="photo-upload"
-                    className="hidden-input"
+                    style={{ display: 'none' }}           // ✅ gizli input (isteğe bağlı)
                   />
+
                   <label htmlFor="photo-upload" className="upload-button">
                     <FaCamera />
                     <span>Fotoğraf Yükle</span>
                   </label>
-                  {formData.photos.length > 0 && (
+
+                  {/* ✅ Güvenli erişim (undefined hatası vermez) */}
+                  {formData.photos && formData.photos.length > 0 && (
                     <div className="photo-preview">
                       <span>{formData.photos.length} fotoğraf seçildi</span>
                     </div>
                   )}
                 </div>
               </div>
+
               
               <div className="form-group">
                 <label>Teslim Adresi</label>
@@ -1391,7 +1338,17 @@ const getOrderStatusInfo = (status) => {
         )}
         {activeTab === 'aktifpaketler' && (
           <div className="aktif-paketler">
-            <h2>Aktif Paketlerim</h2>
+            <div className="content-header">
+                <div className="header-left">
+                    <h2>Aktif Paketlerim</h2>
+                    <p className="content-subtitle">Şu anda satışta olan paketleriniz</p>
+                  </div>
+                  <div className="header-actions">
+                    <button className="btn-primary-modern" onClick={() => setActiveTab('paketolustur')}>
+                      <FaPlus /> Yeni Paket Ekle
+                    </button>
+                  </div>
+                </div>
             
             {loading && (
               <div className="loading-indicator">
@@ -1441,7 +1398,10 @@ const getOrderStatusInfo = (status) => {
         )}
         {activeTab === 'gecmis' && (
           <div className="gecmis-paketler">
-            <h2>Geçmiş Paketlerim</h2>
+            <div className="content-header">
+              <h2>Geçmiş Paketlerim</h2>
+              <p className="content-subtitle">İptal edilmiş ve tamamlanmış paketleriniz</p>
+            </div>
             
             {loading && (
               <div className="loading-indicator">
@@ -1485,8 +1445,11 @@ const getOrderStatusInfo = (status) => {
         
         {activeTab === 'istatistikler' && (
           <div className="istatistikler">
-            <h2>İstatistiklerim</h2>
-            
+              <div className="content-header">
+                <h1>Detaylı İstatistiklerim</h1>
+                <p className="content-subtitle">Performansınızı analiz edin ve gelişim alanlarını keşfedin</p>
+              </div>
+    
             <div className="stat-filters">
               <select>
                 <option key="7days">Son 7 gün</option>
@@ -1581,247 +1544,12 @@ const getOrderStatusInfo = (status) => {
             </div>
           </div>
         )}
-        {activeTab === 'siparisler' && (
-  <div className="siparisler">
-    <div className="siparisler-header">
-      <h2>Siparişlerim</h2>
-      
-      {/* Filtre ve Arama */}
-      <div className="siparis-controls">
-        <div className="filter-controls">
-          <select 
-            value={filterStatus} 
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="status-filter"
-          >
-            <option value="all">Tüm Siparişler</option>
-            <option value="pending">Bekleyen</option>
-            <option value="confirmed">Onaylanan</option>
-            <option value="ready">Hazır</option>
-            <option value="completed">Teslim Edilen</option>
-            <option value="cancelled">İptal Edilen</option>
-          </select>
-        </div>
-        
-        <button 
-          className="btn-secondary refresh-btn"
-          onClick={refreshOrders}
-          disabled={loading}
-        >
-          <FaSearch /> Yenile
-        </button>
-      </div>
-    </div>
-    
-    {/* Loading */}
-    {loading && (
-      <div className="loading-indicator">
-        <div className="spinner"></div>
-        <p>Siparişler yükleniyor...</p>
-      </div>
-    )}
-    
-    {/* Sipariş Listesi */}
-    {!loading && filteredOrders.length === 0 && (
-      <div className="no-orders">
-        <p>
-          {filterStatus === 'all' 
-            ? 'Siparişiniz bulunmamaktadır.' 
-            : `${getOrderStatusInfo(filterStatus).text} durumunda sipariş bulunmamaktadır.`
-          }
-        </p>
-      </div>
-    )}
-    
-    <div className="siparis-list">
-      {filteredOrders.map((siparis) => {
-        const statusInfo = getOrderStatusInfo(siparis.status);
-        
-        return (
-          <div key={siparis.id} className="siparis-card">
-            <div className="siparis-header">
-              <div className="siparis-info">
-                <h3>Sipariş #{siparis.order_number || siparis.id}</h3>
-                <span 
-                  className="status-badge"
-                  style={{ 
-                    color: statusInfo.color, 
-                    backgroundColor: statusInfo.bgColor 
-                  }}
-                >
-                  {statusInfo.text}
-                </span>
-              </div>
-              <div className="siparis-date">
-                {new Date(siparis.created_at).toLocaleDateString('tr-TR', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </div>
-            </div>
-            
-            <div className="siparis-details">
-              <div className="customer-info">
-                <strong>Müşteri:</strong> {siparis.customer_name || 'Anonim'}
-              </div>
-              <div className="package-info">
-                <strong>Paket:</strong> {siparis.package_name}
-              </div>
-              <div className="price-info">
-                <strong>Tutar:</strong> ₺{parseFloat(siparis.total_amount || 0).toFixed(2)}
-              </div>
-              <div className="quantity-info">
-                <strong>Adet:</strong> {siparis.quantity}
-              </div>
-            </div>
-            
-            <div className="siparis-actions">
-              <button 
-                className="btn-outline"
-                onClick={() => handleShowOrderDetail(siparis)}
-              >
-                <FaEye /> Detay
-              </button>
-              
-              {siparis.status === 'confirmed' && (
-                <button 
-                  className="btn-success"
-                  onClick={() => handleMarkReady(siparis.id)}
-                  disabled={loading}
-                >
-                  <FaCheck /> Hazır İşaretle
-                </button>
-              )}
-              
-              {siparis.status === 'ready' && !siparis.delivery_verified && (
-                <button 
-                  className="btn-primary"
-                  onClick={() => handleShowOrderDetail(siparis)}
-                >
-                  <FaCheck /> Kodu Doğrula
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-    
-    {/* Sipariş Detay Modal */}
-    {showOrderDetail && selectedOrder && (
-      <div className="modal-overlay">
-        <div className="modal-content order-detail-modal">
-          <div className="modal-header">
-            <h3>Sipariş Detayı - #{selectedOrder.order_number || selectedOrder.id}</h3>
-            <button 
-              className="close-btn"
-              onClick={() => {
-                setShowOrderDetail(false);
-                setSelectedOrder(null);
-                setVerificationCode('');
-              }}
-            >
-              <FaTimes />
-            </button>
-          </div>
-          
-          <div className="modal-body">
-            <div className="order-info-grid">
-              <div className="info-section">
-                <h4>Sipariş Bilgileri</h4>
-                <div className="info-item">
-                  <span>Durum:</span>
-                  <span className="status-badge" style={{
-                    color: getOrderStatusInfo(selectedOrder.status).color,
-                    backgroundColor: getOrderStatusInfo(selectedOrder.status).bgColor
-                  }}>
-                    {getOrderStatusInfo(selectedOrder.status).text}
-                  </span>
-                </div>
-                <div className="info-item">
-                  <span>Sipariş Tarihi:</span>
-                  <span>{new Date(selectedOrder.created_at).toLocaleString('tr-TR')}</span>
-                </div>
-                <div className="info-item">
-                  <span>Paket:</span>
-                  <span>{selectedOrder.package_name}</span>
-                </div>
-                <div className="info-item">
-                  <span>Adet:</span>
-                  <span>{selectedOrder.quantity}</span>
-                </div>
-                <div className="info-item">
-                  <span>Tutar:</span>
-                  <span>₺{parseFloat(selectedOrder.total_amount || 0).toFixed(2)}</span>
-                </div>
-              </div>
-              
-              <div className="info-section">
-                <h4>Müşteri Bilgileri</h4>
-                <div className="info-item">
-                  <span>İsim:</span>
-                  <span>{selectedOrder.customer_name || 'Belirtilmemiş'}</span>
-                </div>
-                <div className="info-item">
-                  <span>Telefon:</span>
-                  <span>{selectedOrder.customer_phone || 'Belirtilmemiş'}</span>
-                </div>
-                <div className="info-item">
-                  <span>E-posta:</span>
-                  <span>{selectedOrder.customer_email || 'Belirtilmemiş'}</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Teslimat Kodu Doğrulama */}
-            {selectedOrder.status === 'ready' && !selectedOrder.delivery_verified && (
-              <div className="verification-section">
-                <h4>Teslimat Doğrulama</h4>
-                <p>Müşteriden aldığınız 6 haneli doğrulama kodunu girin:</p>
-                <div className="verification-input">
-                  <input
-                    type="text"
-                    placeholder="Örn: 123456"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    maxLength="6"
-                    className="code-input"
-                  />
-                  <button 
-                    className="btn-primary verify-btn"
-                    onClick={() => handleVerifyCode(selectedOrder.id)}
-                    disabled={loading || verificationCode.length !== 6}
-                  >
-                    {loading ? 'Doğrulanıyor...' : 'Doğrula'}
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Teslim Edilmiş Bilgisi */}
-            {selectedOrder.delivery_verified && (
-              <div className="delivered-info">
-                <div className="success-message">
-                  <FaCheck /> Bu sipariş başarıyla teslim edilmiştir.
-                </div>
-                {selectedOrder.delivered_at && (
-                  <div className="delivery-time">
-                    Teslimat Zamanı: {new Date(selectedOrder.delivered_at).toLocaleString('tr-TR')}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+
+
         </div>
       </div>
-    )}
+    </div>
   </div>
-)}
-      </div>
-    </div>
   );
 }
 

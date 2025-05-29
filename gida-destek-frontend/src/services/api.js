@@ -68,8 +68,7 @@ export const packageService = {
   getMyPackages: () => api.get('/packages/my-packages'),
   
   createPackage: (packageData) => {
-    console.log("API'ye gönderilen veri:", packageData);
-    return api.post('/packages', packageData);
+    return api.post('/packages/create', packageData); // ✅ doğru path
   },
   
   updatePackage: (id, packageData) => api.put(`/packages/${id}`, packageData),

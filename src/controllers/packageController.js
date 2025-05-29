@@ -2,16 +2,46 @@ const {
   FoodPackage,
   PackageLocation,
   Seller,
-  // Category modeli index.js'de yüklü değil, kontrol et
+  PackageImage,
 } = require('../models');
-
+const path = require('path');
 // Eğer Category modeli yoksa, models'dan dinamik olarak al
 const models = require('../models');
 const Category = models.Category || models.PackageCategory; // Her iki ismi de dene
-
+const fs = require('fs');
 const multer = require('multer');
-const upload = multer();
 
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'uploads/packages';
+    // Klasör yoksa oluştur
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Dosya adını unique yap
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'package-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const fileFilter = (req, file, cb) => {
+  // Sadece resim dosyalarına izin ver
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Sadece resim dosyaları yüklenebilir!'), false);
+  }
+};
+const uploadConfig = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 5 // Maksimum 5 resim
+  }
+});
 const packageIncludesWithCategory = [
   {
     model: Seller,
@@ -123,39 +153,93 @@ const createPackage = async (req, res) => {
 
     console.log('Oluşturulacak paket verisi:', packageData);
 
-    const yeniPaket = await FoodPackage.create(packageData);
+ const result = await models.sequelize.transaction(async (t) => {
+      // Paketi oluştur
+      const yeniPaket = await FoodPackage.create(packageData, { transaction: t });
 
-    if (hasManualLocation || hasSavedLocation) {
-      const locationData = {
-        package_id: yeniPaket.package_id,
-        location_type: hasManualLocation ? 'manual' : 'saved',
-        latitude: hasManualLocation ? parseFloat(latitude) : null,
-        longitude: hasManualLocation ? parseFloat(longitude) : null,
-        address: address || null
-      };
+      // ⭐ KONUM BİLGİSİNİ KAYDET
+      if (hasManualLocation || hasSavedLocation) {
+        const locationData = {
+          package_id: yeniPaket.package_id,
+          location_type: hasManualLocation ? 'manual' : 'saved',
+          latitude: hasManualLocation ? parseFloat(latitude) : null,
+          longitude: hasManualLocation ? parseFloat(longitude) : null,
+          address: address || null
+        };
 
-      if (hasSavedLocation) {
-        locationData.saved_location_id = parseInt(processedLocationId);
+        if (hasSavedLocation) {
+          locationData.saved_location_id = parseInt(processedLocationId);
+        }
+
+        console.log('Oluşturulacak konum verisi:', locationData);
+
+        try {
+          await PackageLocation.create(locationData, { transaction: t });
+          console.log('Paket konum bilgisi başarıyla kaydedildi');
+        } catch (locationError) {
+          console.error('Konum kaydedilirken hata:', locationError);
+          throw locationError; // Transaction'ı geri al
+        }
       }
 
-      console.log('Oluşturulacak konum verisi:', locationData);
+      // ⭐ RESİMLERİ KAYDET
+      if (req.files && req.files.length > 0) {
+        console.log(`${req.files.length} resim yükleniyor...`);
+        
+        for (let i = 0; i < req.files.length; i++) {
+          const file = req.files[i];
+          const imageData = {
+            package_id: yeniPaket.package_id,
+            image_path: file.path, // Multer'ın verdiği dosya yolu
+            is_primary: i === 0, // İlk resim primary olsun
+            display_order: i + 1,
+            created_at: new Date()
+          };
 
-      try {
-        await PackageLocation.create(locationData);
-        console.log('Paket konum bilgisi başarıyla kaydedildi');
-      } catch (locationError) {
-        console.error('Konum kaydedilirken hata:', locationError);
+          await PackageImage.create(imageData, { transaction: t });
+          console.log(`Resim ${i + 1} kaydedildi:`, imageData.image_path);
+        }
       }
-    }
+
+      return yeniPaket;
+    });
+
+    // ⭐ OLUŞTURULAN PAKETİ RESİMLERLE BİRLİKTE GETİR
+    const createdPackageWithImages = await FoodPackage.findByPk(result.package_id, {
+      include: [
+        {
+          model: PackageLocation,
+          as: 'location',
+          required: false
+        },
+        {
+          model: PackageImage,
+          as: 'images',
+          required: false
+        }
+      ]
+    });
 
     return res.status(201).json({
       success: true,
-      data: yeniPaket,
-      message: 'Paket başarıyla oluşturuldu'
+      data: createdPackageWithImages,
+      message: 'Paket başarıyla oluşturuldu',
+      imageCount: req.files ? req.files.length : 0
     });
 
   } catch (error) {
     console.error('Paket oluşturma hatası:', error);
+    
+    // ⭐ Hata durumunda yüklenen dosyaları temizle
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+          console.log('Hata nedeniyle dosya silindi:', file.path);
+        }
+      });
+    }
+    
     return res.status(500).json({
       success: false,
       message: 'Paket oluşturulurken bir hata oluştu',
@@ -164,16 +248,24 @@ const createPackage = async (req, res) => {
   }
 };
 
+// ⭐ Diğer fonksiyonlarda include'lara PackageImage ekle
 const getPackageById = async (req, res) => {
   try {
     const { id } = req.params;
 
     const paket = await FoodPackage.findByPk(id, {
-      include: [{
-        model: PackageLocation,
-        as: 'location',
-        required: false
-      }]
+      include: [
+        {
+          model: PackageLocation,
+          as: 'location',
+          required: false
+        },
+        {
+          model: PackageImage,
+          as: 'images',
+          required: false
+        }
+      ]
     });
 
     if (!paket) {
@@ -204,11 +296,18 @@ const getActivePackages = async (req, res) => {
         seller_id: seller.seller_id,
         is_active: 1
       },
-      include: [{
-        model: PackageLocation,
-        as: 'location',
-        required: false
-      }],
+      include: [
+        {
+          model: PackageLocation,
+          as: 'location',
+          required: false
+        },
+        {
+          model: PackageImage,
+          as: 'images',
+          required: false
+        }
+      ],
       order: [['created_at', 'DESC']]
     });
 
@@ -220,7 +319,216 @@ const getActivePackages = async (req, res) => {
   }
 };
 
-// Kategori ile aktif paketler
+// ⭐ PACKAGE IMAGE FONKSİYONLARI
+const addPackageImage = async (req, res) => {
+  try {
+    const { packageId } = req.params;
+    const user_id = req.user?.user_id || req.user?.id;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    // Paketin kullanıcıya ait olup olmadığını kontrol et
+    const seller = await Seller.findOne({ where: { user_id } });
+    if (!seller) {
+      return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
+    }
+
+    const package = await FoodPackage.findOne({
+      where: { 
+        package_id: packageId,
+        seller_id: seller.seller_id,
+        is_active: 1
+      }
+    });
+
+    if (!package) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Paket bulunamadı veya size ait değil' 
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Resim dosyası yüklenmedi'
+      });
+    }
+
+    // Mevcut resim sayısını al
+    const existingImageCount = await PackageImage.count({
+      where: { package_id: packageId }
+    });
+
+    const imageData = {
+      package_id: packageId,
+      image_path: req.file.path,
+      is_primary: existingImageCount === 0, // İlk resimse primary yap
+      display_order: existingImageCount + 1,
+      created_at: new Date()
+    };
+
+    const newImage = await PackageImage.create(imageData);
+
+    res.status(201).json({
+      success: true,
+      data: newImage,
+      message: 'Resim başarıyla eklendi'
+    });
+
+  } catch (error) {
+    console.error('Resim eklenirken hata:', error);
+    
+    // Hata durumunda dosyayı sil
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Resim eklenirken hata oluştu',
+      error: error.message
+    });
+  }
+};
+
+const deletePackageImage = async (req, res) => {
+  try {
+    const { packageId, imageId } = req.params;
+    const user_id = req.user?.user_id || req.user?.id;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    // Paketin kullanıcıya ait olup olmadığını kontrol et
+    const seller = await Seller.findOne({ where: { user_id } });
+    if (!seller) {
+      return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
+    }
+
+    const package = await FoodPackage.findOne({
+      where: { 
+        package_id: packageId,
+        seller_id: seller.seller_id
+      }
+    });
+
+    if (!package) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Paket bulunamadı veya size ait değil' 
+      });
+    }
+
+    const image = await PackageImage.findOne({
+      where: {
+        image_id: imageId,
+        package_id: packageId
+      }
+    });
+
+    if (!image) {
+      return res.status(404).json({
+        success: false,
+        message: 'Resim bulunamadı'
+      });
+    }
+
+    // Dosyayı diskten sil
+    if (fs.existsSync(image.image_path)) {
+      fs.unlinkSync(image.image_path);
+      console.log('Dosya silindi:', image.image_path);
+    }
+
+    // Veritabanından sil
+    await image.destroy();
+
+    res.status(200).json({
+      success: true,
+      message: 'Resim başarıyla silindi'
+    });
+
+  } catch (error) {
+    console.error('Resim silinirken hata:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Resim silinirken hata oluştu',
+      error: error.message
+    });
+  }
+};
+
+
+const setPrimaryImage = async (req, res) => {
+  try {
+    const { packageId, imageId } = req.params;
+    const user_id = req.user?.user_id || req.user?.id;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    // Paketin kullanıcıya ait olup olmadığını kontrol et
+    const seller = await Seller.findOne({ where: { user_id } });
+    if (!seller) {
+      return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
+    }
+
+    const package = await FoodPackage.findOne({
+      where: { 
+        package_id: packageId,
+        seller_id: seller.seller_id
+      }
+    });
+
+    if (!package) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Paket bulunamadı veya size ait değil' 
+      });
+    }
+
+    // Transaction ile primary resmi değiştir
+    await models.sequelize.transaction(async (t) => {
+      // Önce tüm resimlerin primary durumunu false yap
+      await PackageImage.update(
+        { is_primary: false },
+        { 
+          where: { package_id: packageId },
+          transaction: t
+        }
+      );
+
+      // Seçilen resmi primary yap
+      await PackageImage.update(
+        { is_primary: true },
+        { 
+          where: { 
+            image_id: imageId,
+            package_id: packageId
+          },
+          transaction: t
+        }
+      );
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Ana resim başarıyla değiştirildi'
+    });
+
+  } catch (error) {
+    console.error('Ana resim değiştirilirken hata:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ana resim değiştirilirken hata oluştu',
+      error: error.message
+    });
+  }
+};
 const getActivePackagesWithCategories = async (req, res) => {
   try {
     const user_id = req.user?.user_id || req.user?.id;
@@ -248,7 +556,6 @@ const getActivePackagesWithCategories = async (req, res) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
   }
 };
-
 const getPackageHistory = async (req, res) => {
   try {
     const user_id = req.user?.user_id || req.user?.id;
@@ -281,7 +588,6 @@ const getPackageHistory = async (req, res) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
   }
 };
-
 const getMyPackages = async (req, res) => {
   try {
     console.log('getMyPackages fonksiyonu çağırıldı');
@@ -361,7 +667,6 @@ const getMyPackages = async (req, res) => {
     });
   }
 };
-
 const cancelPackage = async (req, res) => {
   try {
     const { id } = req.params;
@@ -653,7 +958,6 @@ const getAllActivePackagesWithCategories = async (req, res) => {
     });
   }
 };
-
 module.exports = {
   createPackage,
   getPackageById,
@@ -666,5 +970,9 @@ module.exports = {
   updatePackage,
   getAllActivePackagesForShopping,
   getPackageByIdWithCategory,
-  getAllActivePackagesWithCategories
+  addPackageImage,
+  deletePackageImage,
+  setPrimaryImage,
+  getAllActivePackagesWithCategories,
+  upload: uploadConfig
 };
