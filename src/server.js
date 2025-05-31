@@ -35,18 +35,18 @@ const statisticsRoutes = require('./routes/statisticsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const reviewRoutes = require('./routes/reviewRoutes'); 
 
 // ✅ API route'larını doğru sırada tanımla
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/cart', cartRoutes);
-app.use('/api/orders', orderRoutes); // ✅ Bu satır önemli
 app.use('/api/packages', packageRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/seller-locations', locationRoutes);
-
+app.use('/api/reviews', reviewRoutes);
 app.use('/api/orders', orderRoutes);
 // ✅ Test endpoint'i ekle
 app.get('/api/test', (req, res) => {
@@ -57,11 +57,27 @@ app.get('/api/test', (req, res) => {
 app.get('/', (req, res) => {
   res.send('SofraPay API çalışıyor! 🚀');
 });
+app.get('/api/statistics/debug', (req, res) => {
+  console.log('🐛 Statistics Debug Route Çalıştı');
+  res.json({
+    success: true,
+    message: 'Statistics routes çalışıyor',
+    availableRoutes: [
+      'GET /api/statistics/general',
+      'GET /api/statistics/period/:period',
+      'GET /api/statistics/charts/:type?period=30days'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
 
 // ✅ API route debug middleware
 app.use('/api/*', (req, res, next) => {
   console.log(`🔍 API Route not found: ${req.method} ${req.originalUrl}`);
   console.log('Available routes:');
+  console.log('- GET /api/statistics/general');
+  console.log('- GET /api/statistics/period/30days');
+  console.log('- GET /api/statistics/charts/daily?period=30days');
   console.log('- POST /api/orders/create');
   console.log('- GET /api/orders/my-orders');
   console.log('- GET /api/orders/:orderId');
@@ -71,6 +87,9 @@ app.use('/api/*', (req, res, next) => {
     success: false,
     message: `API endpoint not found: ${req.method} ${req.originalUrl}`,
     availableRoutes: [
+      'GET /api/statistics/general',
+      'GET /api/statistics/period/:period',
+      'GET /api/statistics/charts/:type',
       'POST /api/orders/create',
       'GET /api/orders/my-orders',
       'GET /api/orders/:orderId',

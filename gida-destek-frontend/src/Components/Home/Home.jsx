@@ -7,7 +7,8 @@ import FilterSidebar from './FilterSidebar';
 import packageService from '../../services/packageService';
 import cartService from '../../services/cartServices';
 import { useCart } from '../../contexts/cartContext';
-const Home = () => {
+import HeroImpactSection from './HeroImpactSection';
+ const Home = () => {
   const { addToCart } = useCart();
   const [sortOption, setSortOption] = useState('distance');
   const [realPackages, setRealPackages] = useState([]);
@@ -35,7 +36,15 @@ const Home = () => {
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   
-  const categories = ['Tümü', 'Restoran', 'Fırın & Pastane', 'Market', 'Kafe', 'Manav', 'Diğer'];
+const categories = [
+  { name: 'Tümü', icon: '🏪' },
+  { name: 'Restoran', icon: '🍽️' },
+  { name: 'Fırın & Pastane', icon: '🥖' },
+  { name: 'Market', icon: '🛒' },
+  { name: 'Kafe', icon: '☕' },
+  { name: 'Manav', icon: '🥬' },
+  { name: 'Diğer', icon: '📦' }
+];
 // Tarih formatlaması yardımcı fonksiyonları
 const formatTime = (timeString) => {
   if (!timeString) return 'Belirtilmemiş';
@@ -421,22 +430,208 @@ const handleAddToCart = async (business, quantity = 1) => {
           }
         });
 
+        const discountPercentage = Math.round((1 - business.newPrice / business.oldPrice) * 100);
+        
         const contentString = `
-          <div style="width: 200px; padding: 10px;">
-            <h3 style="margin: 0 0 5px 0;">${business.storeName}</h3>
-            <p style="margin: 0 0 5px 0;">${business.product}</p>
-            <p style="margin: 0 0 5px 0;"><b>₺${business.newPrice.toFixed(2)}</b> <span style="text-decoration: line-through;">₺${business.oldPrice.toFixed(2)}</span></p>
-            <p style="margin: 0 0 5px 0;">Alım Saati: ${business.time}</p>
+          <div style="
+            width: 300px; 
+            padding: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+          ">
+            <div style="
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 15px;
+              text-align: center;
+            ">
+              <h3 style="
+                margin: 0 0 8px 0;
+                font-size: 18px;
+                font-weight: 600;
+                line-height: 1.2;
+              ">${business.storeName}</h3>
+              <p style="
+                margin: 0;
+                font-size: 14px;
+                opacity: 0.9;
+              ">${business.product}</p>
+              <div style="
+                background: rgba(255,255,255,0.2);
+                border-radius: 20px;
+                padding: 4px 12px;
+                margin-top: 8px;
+                display: inline-block;
+                font-size: 12px;
+                font-weight: 600;
+              ">
+                %${discountPercentage} İndirim
+              </div>
+            </div>
+            
+            <div style="padding: 15px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <span style="
+                    color: #666;
+                    text-decoration: line-through;
+                    font-size: 14px;
+                    margin-right: 8px;
+                  ">₺${business.oldPrice.toFixed(2)}</span>
+                  <span style="
+                    color: #27AE60;
+                    font-size: 20px;
+                    font-weight: 700;
+                  ">₺${business.newPrice.toFixed(2)}</span>
+                </div>
+                <div style="
+                  background: #e8f5e8;
+                  color: #27AE60;
+                  padding: 4px 8px;
+                  border-radius: 6px;
+                  font-size: 12px;
+                  font-weight: 600;
+                ">
+                  ${business.distance}
+                </div>
+              </div>
+              
+              <div style="
+                background: #f8f9fa;
+                padding: 10px;
+                border-radius: 8px;
+                margin-bottom: 15px;
+              ">
+                <div style="
+                  display: flex;
+                  align-items: center;
+                  color: #666;
+                  font-size: 14px;
+                  margin-bottom: 5px;
+                ">
+                  <span style="margin-right: 8px;">🕒</span>
+                  <strong>Teslim Zamanı:</strong>
+                </div>
+                <div style="
+                  color: #333;
+                  font-size: 14px;
+                  margin-left: 20px;
+                ">${business.time}</div>
+              </div>
+              
+              <div style="display: flex; gap: 8px;">
+                <button 
+                  onclick="window.handleMapPopupAddToCart(${business.realId})"
+                  style="
+                    flex: 1;
+                    background:rgb(174, 39, 39);
+                    color: white;
+                    border: none;
+                    padding: 12px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#219A52'"
+                  onmouseout="this.style.background='#27AE60'"
+                >
+                  🛒 Kurtar
+                </button>
+                
+                <button 
+                  onclick="window.handleMapPopupViewDetail(${business.realId})"
+                  style="
+                    background: #6C63FF;
+                    color: white;
+                    border: none;
+                    padding: 12px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    min-width: 80px;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#5A52E8'"
+                  onmouseout="this.style.background='#6C63FF'"
+                >
+                  📋 Detay
+                </button>
+                <button 
+                  onclick="window.handleMapPopupDirections(${business.realId})"
+                  style="
+                    background: #FF6B6B;
+                    color: white;
+                    border: none;
+                    padding: 12px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    min-width: 80px;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#E55A5A'"
+                  onmouseout="this.style.background='#FF6B6B'"
+                >
+                  🗺️ Yol Tarifi
+                </button>
+              </div>
+            </div>
           </div>
         `;
 
         const infowindow = new window.google.maps.InfoWindow({
-          content: contentString
+          content: contentString,
+          maxWidth: 300
         });
 
         marker.addListener("click", () => {
+          // Diğer açık infowindow'ları kapat
+          if (window.currentInfoWindow) {
+            window.currentInfoWindow.close();
+          }
           infowindow.open(map, marker);
+          window.currentInfoWindow = infowindow;
         });
+
+        // Global fonksiyonları tanımla
+        window.handleMapPopupAddToCart = (businessId) => {
+          const business = validRealPackages.find(b => b.realId === businessId);
+          if (business) {
+            handleAddToCart(business, 1);
+            if (window.currentInfoWindow) {
+              window.currentInfoWindow.close();
+            }
+          }
+        };
+
+        window.handleMapPopupViewDetail = (businessId) => {
+          const business = validRealPackages.find(b => b.realId === businessId);
+          if (business) {
+            handleProductClick(business);
+            if (window.currentInfoWindow) {
+              window.currentInfoWindow.close();
+            }
+          }
+        };
+        window.handleMapPopupDirections = (businessId) => {
+          const business = validRealPackages.find(b => b.realId === businessId);
+          if (business && business.location) {
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${business.location.lat},${business.location.lng}`;
+            window.open(url, '_blank');
+            if (window.currentInfoWindow) {
+              window.currentInfoWindow.close();
+            }
+          } else {
+            alert('Konum bilgisi bulunamadı');
+          }
+        };
       }
     });
   };
@@ -810,35 +1005,35 @@ if (!packageData.package_id) {
               <div className="product-cards-section">
                 <div className="section-header">
                   <div className="header-info">
-                    <h2 className="section-title-large">🔥 Günün Fırsatları</h2>
-                    <p className="section-subtitle">Gıda israfını önle, çevreyi koru!</p>
+                    <HeroImpactSection impactStats={impactStats} />
+                    
                   </div>
-                  
+                    
                   {isLoadingLocation && (
                     <div className="location-status loading">
                       <FaMapMarkerAlt /> Konum alınıyor...
                     </div>
                   )}
                   
-                  {userLocation && (
+                  {/* {userLocation && (
                     <div className="location-status">
                       <FaMapMarkerAlt /> {MAX_DISTANCE_KM}km içindeki fırsatlar
                     </div>
-                  )}
+                  )} */}
                 </div>
                 
-                {/* Kategori Filtreleri */}
-                <div className="categories-container">
-                  {categories.map((category) => (
-                    <button
-                      key={category}
-                      className={`category-button ${selectedCategory === category ? 'active' : ''}`}
-                      onClick={() => handleCategoryClick(category)}
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
+                  <div className="categories-container">
+                    {categories.map((category) => (
+                      <button
+                        key={category.name}
+                        className={`category-button ${selectedCategory === category.name ? 'active' : ''}`}
+                        onClick={() => handleCategoryClick(category.name)}
+                      >
+                        <span className="category-icon">{category.icon}</span>
+                        <span className="category-text">{category.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 
                 {isLoadingPackages ? (
                   <div className="loading-container">
@@ -882,9 +1077,7 @@ if (!packageData.package_id) {
                                 <FaRegHeart />
                               }
                             </div> */}
-                            <div className="food-saved-tag">
-                              <FaLeaf /> {business.savedCount} kurtarıldı
-                            </div>
+
                             {business.isOwnPackage && (
                               <div className="own-package-badge">
                                 Kendi Paketiniz
@@ -1071,7 +1264,7 @@ if (!packageData.package_id) {
                   }</p>
                 </div>
                 
-                <div className="detail-ratings">
+                {/* <div className="detail-ratings">
                   <div className="detail-rating">
                     <span className="rating-star">★★★★★</span> 4.8/5.0
                   </div>
@@ -1087,14 +1280,26 @@ if (!packageData.package_id) {
                     <li><FaPizzaSlice /> Lezzetli yemekler</li>
                     <li><FaBolt /> Hızlı teslim</li>
                   </ul>
-                </div>
-                
+                </div> */}
                 <button 
+                  className="detail-directions-button" 
+                  onClick={() => {
+                    if (selectedProduct.location) {
+                      const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedProduct.location.lat},${selectedProduct.location.lng}`;
+                      window.open(url, '_blank');
+                    } else {
+                      alert('Konum bilgisi bulunamadı');
+                    }
+                  }}
+                >
+                  🗺️ Yol Tarifi Al
+                </button>
+                {/* <button 
                   className="detail-reserve-button" 
                   onClick={() => addToCart(selectedProduct)}
                 >
                   Ürünü Kurtar
-                </button>
+                </button> */}
               </div>
             </div>
           </div>

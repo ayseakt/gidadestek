@@ -1,6 +1,6 @@
 const { User, UserProfile, Seller } = require('../models');
 const bcrypt = require('bcrypt');
-
+const { Op } = require('sequelize');
 // Kullanıcı profil bilgilerini getir
 const getProfile = async (req, res) => {
   try {
@@ -8,7 +8,10 @@ const getProfile = async (req, res) => {
 
     const user = await User.findOne({
       where: { user_id: userId },
-      include: [{ model: UserProfile }],
+      include: [{
+        model: UserProfile,
+        as: 'profile' // ✅ alias burada doğru kullanılmış
+      }],
       attributes: { exclude: ['password_hash'] }
     });
 
@@ -18,17 +21,21 @@ const getProfile = async (req, res) => {
         message: 'Kullanıcı bulunamadı'
       });
     }
-    const userProfile = user.UserProfile;
+
+    // ❌ user.UserProfile --> Hatalı çünkü alias 'profile'
+    const userProfile = user.profile;
+
     const firstName = userProfile?.first_name || '';
     const lastName = userProfile?.last_name || '';
+    
     const response = {
       success: true,
       user: {
         id: user.user_id,
         email: user.email,
         phone: user.phone_number,
-        name:`${firstName} ${lastName}`.trim() || 'Kullanıcı',
-        first_name:  firstName,
+        name: `${firstName} ${lastName}`.trim() || 'Kullanıcı',
+        first_name: firstName,
         last_name: lastName,
         profile_picture: userProfile?.profile_picture || null,
         bio: userProfile?.bio || ''
@@ -46,15 +53,20 @@ const getProfile = async (req, res) => {
   }
 };
 
+
 // Profil bilgilerini güncelle
 const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { firstName, lastName, email, phone, bio } = req.body;
 
+    // E-posta kontrolü - DÜZELTME
     if (email) {
       const existingUser = await User.findOne({
-        where: { email, user_id: { [User.sequelize.Op.ne]: userId } }
+        where: { 
+          email, 
+          user_id: { [Op.ne]: userId } // ✅ Doğru kullanım
+        }
       });
 
       if (existingUser) {
@@ -65,9 +77,13 @@ const updateProfile = async (req, res) => {
       }
     }
 
+    // Telefon kontrolü - DÜZELTME
     if (phone) {
       const existingPhoneUser = await User.findOne({
-        where: { phone_number: phone, user_id: { [User.sequelize.Op.ne]: userId } }
+        where: { 
+          phone_number: phone, 
+          user_id: { [Op.ne]: userId } // ✅ Doğru kullanım
+        }
       });
 
       if (existingPhoneUser) {
@@ -93,14 +109,12 @@ const updateProfile = async (req, res) => {
       }
 
       if (firstName || lastName || bio !== undefined) {
-        // Önce UserProfile var mı kontrol edelim
         let userProfile = await UserProfile.findOne({
           where: { user_id: userId },
           transaction: t
         });
 
         if (!userProfile) {
-          // UserProfile yoksa oluştur
           await UserProfile.create({
             user_id: userId,
             first_name: firstName || '',
@@ -110,7 +124,6 @@ const updateProfile = async (req, res) => {
             updated_at: new Date()
           }, { transaction: t });
         } else {
-          // UserProfile varsa güncelle
           await UserProfile.update(
             {
               ...(firstName !== undefined && { first_name: firstName }),
@@ -129,10 +142,14 @@ const updateProfile = async (req, res) => {
 
     const updatedUser = await User.findOne({
       where: { user_id: userId },
-      include: [{ model: UserProfile }],
+      include: [{ 
+        model: UserProfile,
+        as: 'profile'
+      }],
       attributes: { exclude: ['password_hash'] }
     });
-    const userProfile = updatedUser.UserProfile;
+    
+    const userProfile = updatedUser.profile;
     
     res.status(200).json({
       success: true,
@@ -143,8 +160,8 @@ const updateProfile = async (req, res) => {
         phone: updatedUser.phone_number,
         name: `${firstName} ${lastName}`.trim() || 'Kullanıcı',
         first_name: firstName,
-        last_name:lastName,
-        profile_picture:userProfile?.profile_picture || null,
+        last_name: lastName,
+        profile_picture: userProfile?.profile_picture || null,
         bio: userProfile?.bio || ''
       }
     });
@@ -157,7 +174,6 @@ const updateProfile = async (req, res) => {
     });
   }
 };
-
 // Şifre değiştirme
 const changePassword = async (req, res) => {
   try {
@@ -264,6 +280,7 @@ const getSellerProfile = async (req, res) => {
       where: { user_id: userId },
       include: [{
         model: User,
+        as: 'user', // ✅ DOĞRU! Seller.js'teki alias ile aynı
         attributes: ['email', 'phone_number']
       }]
     });
@@ -277,7 +294,6 @@ const getSellerProfile = async (req, res) => {
 
     res.json({
       success: true,
-      
       data: {
         seller_id: seller.seller_id,
         business_name: seller.business_name || '',
@@ -286,9 +302,9 @@ const getSellerProfile = async (req, res) => {
         rating: seller.rating || 0,
         total_ratings: seller.total_ratings || 0,
         is_verified: seller.is_verified || false,
-        email: seller.User?.email || '',
-        phone_number: seller.User?.phone_number || '',
-        // Profil tamamlanma durumu
+        // ✅ Alias'ı 'user' olarak değiştir
+        email: seller.user?.email || '',
+        phone_number: seller.user?.phone_number || '',
         isProfileComplete: !!(seller.business_name && seller.business_type && seller.business_description)
       }
     });

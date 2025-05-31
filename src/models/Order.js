@@ -306,7 +306,7 @@ module.exports = (sequelize, DataTypes) => {
         { 
           model: sequelize.models.Seller, 
           as: 'seller',
-          attributes: ['seller_id', 'store_name', 'address']
+          attributes: ['seller_id', 'business_name',]
         },
         { 
           model: sequelize.models.OrderItem, 
@@ -400,6 +400,10 @@ module.exports = (sequelize, DataTypes) => {
     Order.hasMany(models.OrderStatusHistory, {
       foreignKey: 'order_id',
       as: 'statusHistory'
+    });
+    Order.hasMany(models.Review, {
+      foreignKey: 'order_id',
+      as: 'reviews'
     });
   };
 

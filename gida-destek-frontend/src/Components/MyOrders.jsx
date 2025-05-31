@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaChevronLeft, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch, FaFilter, FaReceipt, FaSpinner ,FaDirections} from 'react-icons/fa';
+import { FaChevronLeft, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaSearch, FaFilter, FaReceipt, FaSpinner ,FaDirections, FaStar,
+  FaRegStar, FaStarHalfAlt, FaComment} from 'react-icons/fa';
 import './MyOrders.css';
 
 function MyOrders() {
@@ -16,6 +17,18 @@ function MyOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Yorum modalı state'leri
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState(null);
+  const [reviewData, setReviewData] = useState({
+    rating: 5,
+    comment: '',
+    food_quality_rating: 5,
+    service_rating: 5,
+    value_rating: 5,
+    is_anonymous: false
+  });
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   // Navigation handler functions
   const navigateToProfile = () => {
@@ -72,6 +85,28 @@ function MyOrders() {
     'teslim_edildi': { color: '#28a745', icon: <FaCheckCircle />, text: 'Teslim Edildi' },
     'iptal_edildi': { color: '#dc3545', icon: <FaTimesCircle />, text: 'İptal Edildi' },
     'hazir': { color: '#17a2b8', icon: <FaCheckCircle />, text: 'Hazır' }
+  };
+  
+
+  // Yıldız gösterimi
+  const renderStars = (rating, onRatingChange = null) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <span 
+          key={i} 
+          style={{ 
+            color: i <= rating ? '#ffc107' : '#dee2e6',
+            cursor: onRatingChange ? 'pointer' : 'default',
+            fontSize: '1.2rem'
+          }}
+          onClick={() => onRatingChange && onRatingChange(i)}
+        >
+          <FaStar />
+        </span>
+      );
+    }
+    return stars;
   };
 
   // Backend'den siparişleri getir - GELİŞTİRİLMİŞ HATA YÖNETİMİ
@@ -177,21 +212,30 @@ const fetchOrders = async (showLoader = true) => {
 if (data.success) {
   console.log('✅ Siparişler başarıyla getirildi:', data.orders);
   
-  // Backend'den gelen veriyi frontend formatına çevir
+  // Backend'den gelen veriyi frontend formatına çevir - seller_id EKLENDİ
   const formattedOrders = (data.orders || []).map(order => ({
     id: order.id,
-    storeName: order.storeName || 'Restoran Adı Yok',
-    productName: order.orderName || order.productName || 'Ürün Adı Yok',
-    price: parseFloat(order.totalPrice || order.price || order.amount || 0) || 0,
-    originalPrice: parseFloat(order.originalPrice || order.totalPrice || order.price || order.amount || 0) || 0,
+    seller_id: order.seller_id || order.sellerId || order.seller?.id, // ✅ Satıcı ID'si eklendi
+    storeName: order.sellerName || order.seller || order.seller?.business_name || 'İş Yeri Adı Belirtilmemiş',
+    productName: order.productName || order.orderName || 
+                        (order.items && order.items.length > 0 ? 
+                         order.items.map(item => item.name).join(', ') : 'Ürün Adı Yok'),
+    price: parseFloat(order.price || order.totalAmount || order.total_amount || 0),
+    originalPrice: parseFloat(order.originalPrice || order.price || order.totalAmount || order.total_amount || 0),
     orderDate: order.createdAt || order.orderDate || new Date().toISOString(),
     pickupDate: order.pickupDate || order.createdAt || new Date().toISOString(),
     status: order.status === 'yeni' ? 'devam_ediyor' : order.status,
-    address: order.address || 'Adres bilgisi yok',
+    address: order.address || order.seller?.address || 'Adres bilgisi yok',
     confirmationCode: order.confirmationCode,
-    trackingNumber: order.orderNumber,
+    trackingNumber: order.trackingNumber || `SPY${(order.id || order.order_id || '').toString().padStart(8, '0')}`,
     storeImage: order.storeImage || '/default-store.png',
-    items: order.items || [{ name: order.orderName || 'Ürün', quantity: 1, price: order.totalPrice || 0 }]
+    items: order.items || [{ 
+      name: order.productName || order.orderName || 'Ürün', 
+      quantity: 1, 
+      price: order.price || order.totalAmount || 0 
+    }],
+    hasReview: order.hasReview || false,
+    package_id: order.package_id // Yorum için gerekli
   }));
   
   console.log('🔄 Formatlanmış siparişler:', formattedOrders);
@@ -199,8 +243,8 @@ if (data.success) {
   setFilteredOrders(formattedOrders);
   setError(null);
 } else {
-      throw new Error(data.message || 'Siparişler getirilemedi');
-    }
+  throw new Error(data.message || 'Siparişler getirilemedi');
+}
   } catch (err) {
     console.error('❌ Sipariş getirme hatası:', err);
     
@@ -238,7 +282,84 @@ if (data.success) {
     setRefreshing(false);
   }
 };
+  // Yorum gönderme
+// Yorum gönderme - DÜZELTİLMİŞ VERSİYON
+const submitReview = async () => {
+  if (!reviewOrder) return;
+  
+  try {
+    setSubmittingReview(true);
+    const token = localStorage.getItem('token');
+    const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5051';
+    
+    // Backend'e gönderilecek veri - EKSİK ALANLAR EKLENDİ
+    const reviewPayload = {
+      order_id: reviewOrder.id,
+      package_id: reviewOrder.package_id,
+      seller_id: reviewOrder.seller_id || reviewOrder.sellerId, // ✅ Satıcı ID eklendi
+      rating: reviewData.rating, // ✅ Genel puan (zorunlu)
+      overall_rating: reviewData.rating, // ✅ Backend'in beklediği alan adı farklı olabilir
+      comment: reviewData.comment,
+      food_quality_rating: reviewData.food_quality_rating,
+      service_rating: reviewData.service_rating,
+      value_rating: reviewData.value_rating,
+      is_anonymous: reviewData.is_anonymous
+    };
 
+    console.log('📤 Yorum gönderiliyor:', reviewPayload);
+    
+    const response = await fetch(`${baseUrl}/api/reviews/create`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(reviewPayload)
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      console.log('✅ Yorum başarıyla gönderildi:', data);
+      
+      // Siparişleri güncelle
+      const updatedOrders = orders.map(order => 
+        order.id === reviewOrder.id 
+          ? { ...order, hasReview: true }
+          : order
+      );
+      setOrders(updatedOrders);
+      setFilteredOrders(updatedOrders);
+      
+      // Modal'ı kapat ve verileri sıfırla
+      setShowReviewModal(false);
+      setReviewOrder(null);
+      setReviewData({
+        rating: 5,
+        comment: '',
+        food_quality_rating: 5,
+        service_rating: 5,
+        value_rating: 5,
+        is_anonymous: false
+      });
+      
+      alert('Yorumunuz başarıyla gönderildi!');
+    } else {
+      console.error('❌ Backend hatası:', data);
+      throw new Error(data.message || 'Yorum gönderilirken hata oluştu');
+    }
+  } catch (error) {
+    console.error('❌ Yorum gönderme hatası:', error);
+    alert('Yorum gönderilirken hata oluştu: ' + error.message);
+  } finally {
+    setSubmittingReview(false);
+  }
+};
+    // Yorum modalını aç
+  const openReviewModal = (order) => {
+    setReviewOrder(order);
+    setShowReviewModal(true);
+  };
   // Component mount edildiğinde siparişleri getir
   useEffect(() => {
     fetchOrders(true);
@@ -453,49 +574,9 @@ if (data.success) {
         borderBottom: '1px solid #eee',
         backgroundColor: '#fff'
       }}>
-        <button 
-          onClick={() => navigate(-1)}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '1.2rem',
-            cursor: 'pointer',
-            color: '#333'
-          }}
-        >
-          <FaChevronLeft />
-        </button>
+
         
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            onClick={testApiConnection}
-            style={{
-              background: 'none',
-              border: '1px solid #17a2b8',
-              color: '#17a2b8',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.8rem'
-            }}
-          >
-            API Test
-          </button>
-          <button 
-            onClick={handleRefresh}
-            disabled={refreshing}
-            style={{
-              background: 'none',
-              border: '1px solid #ddd',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              cursor: refreshing ? 'not-allowed' : 'pointer',
-              opacity: refreshing ? 0.6 : 1
-            }}
-          >
-            {refreshing ? <FaSpinner className="fa-spin" /> : 'Yenile'}
-          </button>
-        </div>
+
       </div>
 
       {/* Main content area */}
@@ -635,7 +716,7 @@ if (data.success) {
                 >
                   <div className="trendyol-order-top">
                     <div className="trendyol-order-restaurant">
-                      <h3>Restoran</h3>
+                      
                       <p>{order.storeName}</p>
                     </div>
                     <div className="trendyol-order-date">
@@ -680,6 +761,46 @@ if (data.success) {
                       )}
                       <p className="product-description">{order.productName}</p>
                     </div>
+                                        {/* Yorum butonu - Sadece teslim edilmiş siparişler için */}
+                    {order.status === 'teslim_edildi' && (
+                      <div className="review-section" style={{ marginTop: '0.5rem' }}>
+                        {!order.hasReview ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openReviewModal(order);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              background: '#ffc107',
+                              color: '#212529',
+                              border: 'none',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: '500'
+                            }}
+                          >
+                            <FaStar />
+                            Yorum Yap & Puanla
+                          </button>
+                        ) : (
+                          <div style={{ 
+                            color: '#28a745', 
+                            fontSize: '0.9rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            <FaCheckCircle />
+                            Yorumunuz alındı
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {/* Yol Tarifi Butonu - Sadece hazır ve devam eden siparişler için */}
                     {(order.status === 'hazir' || order.status === 'devam_ediyor') && order.address && (
                       <div className="order-directions">
@@ -751,6 +872,162 @@ if (data.success) {
           </div>
         </div>
       </div>
+      {showReviewModal && reviewOrder && (
+        <div 
+          className="order-detail-overlay" 
+          onClick={() => setShowReviewModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000         }}
+        >
+          <div 
+            className="order-detail-modal" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '2rem',
+              width: '90%',
+              maxWidth: '500px',
+              maxHeight: '80vh',
+              overflowY: 'auto'
+            }}
+          >
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>
+                Siparişinizi Değerlendirin
+              </h2>
+              <p style={{ color: '#666', margin: 0 }}>
+                {reviewOrder.storeName} - {reviewOrder.productName}
+              </p>
+            </div>
+
+            {/* Genel Puan */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Genel Puan:
+              </label>
+              <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.5rem' }}>
+                {renderStars(reviewData.rating, (rating) => 
+                  setReviewData({...reviewData, rating})
+                )}
+              </div>
+            </div>
+
+            {/* Yemek Kalitesi */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Yemek Kalitesi:
+              </label>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                {renderStars(reviewData.food_quality_rating, (rating) => 
+                  setReviewData({...reviewData, food_quality_rating: rating})
+                )}
+              </div>
+            </div>
+
+            {/* Hizmet */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Hizmet:
+              </label>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                {renderStars(reviewData.service_rating, (rating) => 
+                  setReviewData({...reviewData, service_rating: rating})
+                )}
+              </div>
+            </div>
+
+            {/* Fiyat-Performans */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Fiyat-Performans:
+              </label>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                {renderStars(reviewData.value_rating, (rating) => 
+                  setReviewData({...reviewData, value_rating: rating})
+                )}
+              </div>
+            </div>
+
+            {/* Yorum */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Yorumunuz:
+              </label>
+              <textarea
+                value={reviewData.comment}
+                onChange={(e) => setReviewData({...reviewData, comment: e.target.value})}
+                placeholder="Deneyiminizi paylaşın..."
+                style={{
+                  width: '100%',
+                  minHeight: '100px',
+                  padding: '0.5rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  resize: 'vertical',
+                  fontFamily: 'inherit'
+                }}
+              />
+            </div>
+
+            {/* Anonim Seçeneği */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={reviewData.is_anonymous}
+                  onChange={(e) => setReviewData({...reviewData, is_anonymous: e.target.checked})}
+                />
+                Anonim olarak gönder
+              </label>
+            </div>
+
+            {/* Butonlar */}
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  background: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                İptal
+              </button>
+              <button
+                onClick={submitReview}
+                disabled={submittingReview}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#ffc107',
+                  color: '#212529',
+                  cursor: submittingReview ? 'not-allowed' : 'pointer',
+                  opacity: submittingReview ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                {submittingReview && <FaSpinner className="fa-spin" />}
+                Gönder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sipariş detay modalı */}
       {showOrderDetail && selectedOrder && (
@@ -901,7 +1178,7 @@ if (data.success) {
                 </button>
               )}
               
-              {selectedOrder.status === 'teslim_edildi' && (
+              {/* {selectedOrder.status === 'teslim_edildi' && (
                 <button 
                   className="trendyol-primary-button"
                   onClick={() => {
@@ -911,7 +1188,7 @@ if (data.success) {
                 >
                   Tekrar Sipariş Ver
                 </button>
-              )}
+              )} */}
             </div>
           </div>
         </div>

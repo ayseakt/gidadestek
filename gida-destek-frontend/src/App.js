@@ -13,6 +13,7 @@ import { AuthProvider } from './context/authContext'; // ✅ EKLENDİ
 import './App.css';
 import SellerProfile from './Components/SellerProfile';
 import IncominOrder from './Components/InCominOrder';
+import MyReviews from './Components/MyReview';
 
 const MainScreen = ({ userData, onLogout }) => {
   return (
@@ -24,11 +25,12 @@ const MainScreen = ({ userData, onLogout }) => {
           <Route path="/sofrani-paylas" element={<SofraniPaylas />} />
           <Route path="/paketlerim" element={<IncominOrder />} />
           <Route path="/aldiklarim" element={<MyOrders />} />
+          <Route path="/degerlerim" element={<MyReviews />} />
           <Route path="/profil" element={<UserProfile userData={userData} />} />
           <Route path="/favoriler" element={<Favorites />} />
           <Route path="/odeme" element={<PaymentPage />} /> 
           <Route path="/giris" element={<Navigate to="/" replace />} />
-          <Route path="/seller-profile" element={<SellerProfile />} />zz
+          <Route path="/seller-profile" element={<SellerProfile />} />
         </Routes>
       </main>
       <footer className="footer">

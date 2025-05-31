@@ -1,4 +1,4 @@
-/* Modern AddressButton.css */
+/* Modern AddressButton.css - Düzeltilmiş Versiyon */
 
 .address-selection-container {
   position: relative;
@@ -65,7 +65,7 @@
   font-weight: 600;
 }
 
-/* Popup Overlay */
+/* Popup Overlay - Düzeltildi */
 .address-overlay {
   position: fixed;
   top: 0;
@@ -79,6 +79,8 @@
   align-items: center;
   z-index: 1000;
   animation: overlayFadeIn 0.3s ease;
+  padding: 20px; /* Ekran kenarlarından boşluk */
+  box-sizing: border-box;
 }
 
 @keyframes overlayFadeIn {
@@ -86,12 +88,12 @@
   to { opacity: 1; }
 }
 
-/* Saved Addresses Panel */
+/* Saved Addresses Panel - Düzeltildi */
 .address-popup {
   position: relative;
-  width: 90%;
+  width: 100%;
   max-width: 520px;
-  max-height: 90vh;
+  max-height: calc(100vh - 40px); /* Viewport yüksekliğinden margin düş */
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   border-radius: 20px;
   overflow: hidden;
@@ -100,6 +102,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  margin: auto; /* Otomatik merkezleme */
 }
 
 @keyframes popupSlideIn {
@@ -120,6 +123,7 @@
   padding: 20px 24px;
   background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
   color: white;
+  flex-shrink: 0; /* Header'ın küçülmesini önle */
 }
 
 .address-popup-header h3 {
@@ -151,10 +155,11 @@
 }
 
 .address-list {
-  max-height: 400px;
+  max-height: none; /* Sabit yükseklik kaldırıldı */
   overflow-y: auto;
-  flex: 1;
+  flex: 1; /* Kalan alanı kapla */
   padding: 8px 0;
+  min-height: 0; /* Flexbox ile çalışması için */
 }
 
 .address-item {
@@ -233,6 +238,7 @@
   transition: all 0.3s ease;
   font-size: 15px;
   box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+  flex-shrink: 0; /* Butonun küçülmesini önle */
 }
 
 .add-new-address-button:hover {
@@ -240,26 +246,28 @@
   box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
 }
 
-/* Map Popup Styles */
+/* Map Popup Styles - Düzeltildi */
 .map-popup {
   position: relative;
-  width: 90%;
+  width: 100%;
   max-width: 650px;
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
   animation: popupSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  max-height: 90vh;
+  max-height: calc(100vh - 40px); /* Viewport yüksekliğinden margin düş */
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  margin: auto; /* Otomatik merkezleme */
 }
 
 .map-popup-header {
   padding: 20px 24px;
   background: linear-gradient(135deg, #ff6b35 0%, #ff8f65 100%);
   color: white;
+  flex-shrink: 0;
 }
 
 .map-popup-header h3 {
@@ -278,6 +286,7 @@
 .map-search-container {
   padding: 20px 24px;
   background: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
 }
 
 .map-search-box {
@@ -330,7 +339,7 @@
   flex: 1;
   height: 320px;
   position: relative;
-  min-height: 320px;
+  min-height: 200px; /* Minimum yükseklik azaltıldı */
   border-top: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
 }
@@ -371,6 +380,9 @@
 .address-form {
   padding: 24px;
   background: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+  max-height: 300px; /* Form için maksimum yükseklik */
+  overflow-y: auto;
 }
 
 .form-row {
@@ -460,49 +472,126 @@
 }
 
 /* Scroll bar styling */
-.address-list::-webkit-scrollbar {
+.address-list::-webkit-scrollbar,
+.address-form::-webkit-scrollbar {
   width: 6px;
 }
 
-.address-list::-webkit-scrollbar-track {
+.address-list::-webkit-scrollbar-track,
+.address-form::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.05);
   border-radius: 10px;
 }
 
-.address-list::-webkit-scrollbar-thumb {
+.address-list::-webkit-scrollbar-thumb,
+.address-form::-webkit-scrollbar-thumb {
   background: linear-gradient(135deg, #ff6b35, #ff8f65);
   border-radius: 10px;
 }
 
-.address-list::-webkit-scrollbar-thumb:hover {
+.address-list::-webkit-scrollbar-thumb:hover,
+.address-form::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #e55a2b, #ff6b35);
 }
 
-/* For mobile devices */
-@media (max-width: 480px) {
+/* Mobil ve küçük ekranlar için düzeltmeler */
+@media (max-width: 768px) {
+  .address-overlay {
+    padding: 10px;
+  }
+  
   .address-popup,
   .map-popup {
-    width: 100%;
-    height: 100%;
     max-width: none;
-    border-radius: 0;
-    max-height: 100vh;
+    width: calc(100% - 20px);
+    max-height: calc(100vh - 20px);
+    border-radius: 16px;
   }
   
   .map-container {
-    height: 35vh;
+    height: 250px;
+    min-height: 200px;
+  }
+  
+  .address-popup-header,
+  .map-popup-header {
+    padding: 16px 20px;
+  }
+  
+  .address-popup-header h3,
+  .map-popup-header h3 {
+    font-size: 18px;
+  }
+  
+  .address-form {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .address-overlay {
+    padding: 5px;
+  }
+  
+  .address-popup,
+  .map-popup {
+    width: calc(100% - 10px);
+    max-height: calc(100vh - 10px);
+    border-radius: 12px;
+  }
+  
+  .map-container {
+    height: 200px;
+    min-height: 150px;
   }
   
   .address-button {
     padding: 12px 16px;
     height: 48px;
+    font-size: 14px;
   }
   
   .form-actions {
     flex-direction: column;
+    gap: 12px;
   }
   
   .form-actions button {
     width: 100%;
+  }
+  
+  .address-popup-header,
+  .map-popup-header {
+    padding: 14px 16px;
+  }
+  
+  .address-form {
+    padding: 16px;
+  }
+  
+  .add-new-address-button {
+    margin: 12px;
+    width: calc(100% - 24px);
+  }
+}
+
+/* Çok küçük ekranlar için */
+@media (max-width: 320px) {
+  .address-overlay {
+    padding: 0;
+  }
+  
+  .address-popup,
+  .map-popup {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+  
+  .map-container {
+    height: 180px;
+    min-height: 120px;
   }
 }

@@ -37,7 +37,97 @@ function PaymentPage() {
   const validateCartRef = useRef(false);
   const mountedRef = useRef(true);
   const { requestNotificationPermission } = useCart(); // ✅ burada çağrılır
+  const ConfettiCelebration = () => {
+    useEffect(() => {
+      // Sesli kutlama (opsiyonel)
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmhfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfCit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBit+zPLNeSsFJHfH8N2QQAoUXrTp66hVFApGn//9k=');
+      
+      try {
+        audio.volume = 0.3;
+        audio.play().catch(() => {}); // Ses çalmazsa sessizce devam et
+      } catch (error) {
+        // Ses hatası önemli değil
+      }
 
+      // Konfeti oluştur
+      const createConfetti = () => {
+        const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+        const confettiCount = 150;
+        
+        for (let i = 0; i < confettiCount; i++) {
+          const confetti = document.createElement('div');
+          confetti.className = 'confetti-piece';
+          confetti.style.cssText = `
+            position: fixed;
+            width: ${Math.random() * 10 + 5}px;
+            height: ${Math.random() * 10 + 5}px;
+            background: ${colors[Math.floor(Math.random() * colors.length)]};
+            left: ${Math.random() * 100}vw;
+            top: -10px;
+            z-index: 10000;
+            pointer-events: none;
+            border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+            animation: confetti-fall ${Math.random() * 3 + 2}s linear forwards;
+            transform: rotate(${Math.random() * 360}deg);
+          `;
+          
+          document.body.appendChild(confetti);
+          
+          // Animasyon bitince temizle
+          setTimeout(() => {
+            if (confetti.parentNode) {
+              confetti.parentNode.removeChild(confetti);
+            }
+          }, 5000);
+        }
+      };
+
+      // CSS animasyonu ekle
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes confetti-fall {
+          to {
+            transform: translateY(100vh) rotate(720deg);
+            opacity: 0;
+          }
+        }
+        
+        .celebration-message {
+          animation: celebration-bounce 0.6s ease-out;
+          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        @keyframes celebration-bounce {
+          0% { transform: scale(0.3) rotate(-5deg); opacity: 0; }
+          50% { transform: scale(1.1) rotate(2deg); }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        
+        .success-icon {
+          animation: success-pulse 1s ease-in-out infinite alternate;
+        }
+        
+        @keyframes success-pulse {
+          from { transform: scale(1); }
+          to { transform: scale(1.1); filter: brightness(1.2); }
+        }
+      `;
+      
+      document.head.appendChild(style);
+      
+      // Konfeti başlat
+      createConfetti();
+      
+      // Cleanup function
+      return () => {
+        if (style.parentNode) {
+          style.parentNode.removeChild(style);
+        }
+      };
+    }, []);
+
+    return null;
+  };
 
   // Memoized validateCart fonksiyonu
   const memoizedValidateCart = useCallback(async () => {
@@ -150,7 +240,7 @@ function PaymentPage() {
         
         // 3 saniye sonra yönlendir
         setTimeout(() => {
-          navigate('/orders', { 
+          navigate('/aldiklarim', { 
             state: { 
               orderId: result.orderId,
               trackingNumber: result.trackingNumber,
@@ -226,7 +316,12 @@ function PaymentPage() {
       <div className="payment-container">
         <div className="payment-success">
           <FaCheckCircle className="success-icon" />
-          <h2>🎉 Ödeme Başarılı!</h2>
+          <ConfettiCelebration />
+          <div className="celebration-message">
+            <h2>🎉 Tebrikler! Bir Paket Kurtardınız! 🌱</h2>
+            <p className="celebration-subtitle">Çevreye katkıda bulundunuz ve lezzetli yemeklerin çöpe gitmesini engellediniz!</p>
+          </div>
+          <p className="success-message">{paymentResult.message}</p>
           <p className="success-message">{paymentResult.message}</p>
           
           <div className="success-details">
@@ -268,7 +363,7 @@ function PaymentPage() {
           <div className="success-actions">
             <button 
               className="primary-button"
-              onClick={() => navigate('/orders')}
+              onClick={() => navigate('/aldiklarim')}
             >
               Siparişlerimi Görüntüle
             </button>

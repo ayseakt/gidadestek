@@ -1,27 +1,19 @@
 const express = require('express');
 const router = express.Router();
-// Gerekli controller veya model import'ları
 
-// "/api/statistics/my-stats" endpoint'ini ekleyin
-router.get('/my-stats', async (req, res) => {
-  try {
-    // Gerçek uygulamanızda burada veritabanından veri çekersiniz
-    // Şimdilik örnek veri dönelim
-    res.json({
-      totalPackages: 10,
-      activePackages: 5,
-      completedPackages: 3,
-      cancelledPackages: 2,
-      totalEarnings: 1500,
-      ratings: {
-        average: 4.5,
-        count: 8
-      }
-    });
-  } catch (error) {
-    console.error('İstatistik verisi alma hatası:', error);
-    res.status(500).json({ error: 'İstatistik verileri alınamadı' });
-  }
-});
+const statisticsController = require('../controllers/statisticsController');
+console.log('statisticsController:', statisticsController);
+
+const authenticateToken = require('../middleware/authMiddleware');
+
+// ✅ DÜZELTME: Route yolları prefix olmadan
+// /api/statistics zaten server.js'de tanımlı
+router.get('/general', authenticateToken, statisticsController.getGeneralStatistics);
+router.get('/period/:period', authenticateToken, statisticsController.getPeriodStatistics);
+router.get('/charts/:type', authenticateToken, statisticsController.getChartData);
+router.get('/detailed/:sellerId', authenticateToken, statisticsController.getDetailedStatistics);
+// ✅ YENİ: Frontend'in beklediği route
+router.get('/my-stats', authenticateToken, statisticsController.getGeneralStatistics);
+
 
 module.exports = router;

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import authService from '../services/AuthService';
 import locationService from '../services/locationService';
 import orderService from '../services/orderService'; 
+import StatisticsDashboard from './Statistics'; 
 function SofraniPaylas() {
   // Düzenleme state'i eklendi
   const [editingPackage, setEditingPackage] = useState(null);
@@ -37,7 +38,7 @@ function SofraniPaylas() {
   const navigate = useNavigate();
   
   // Diğer state'ler
-  const [activeTab, setActiveTab] = useState('paketolustur');
+  const [activeTab, setActiveTab] = useState('istatistikler');
   const [paketlerim, setPaketlerim] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1007,6 +1008,13 @@ const getOrderStatusInfo = (status) => {
         
         <nav className="sidebar-nav">
           <div 
+            className={`nav-item ${activeTab === 'istatistikler' ? 'active' : ''}`}
+            onClick={() => setActiveTab('istatistikler')}
+          >
+            <FaChartBar className="nav-icon" />
+            <span>İstatistikler</span>
+          </div>
+          <div 
             className={`nav-item ${activeTab === 'paketolustur' ? 'active' : ''}`} 
             onClick={() => setActiveTab('paketolustur')}
           >
@@ -1030,13 +1038,7 @@ const getOrderStatusInfo = (status) => {
             <FaHistory className="nav-icon" />
             <span>Geçmiş Paketler</span>
           </div>
-          <div 
-            className={`nav-item ${activeTab === 'istatistikler' ? 'active' : ''}`}
-            onClick={() => setActiveTab('istatistikler')}
-          >
-            <FaChartBar className="nav-icon" />
-            <span>İstatistikler</span>
-          </div>
+
         </nav>
         
         <div className="sidebar-stats">
@@ -1444,105 +1446,8 @@ const getOrderStatusInfo = (status) => {
         )}
         
         {activeTab === 'istatistikler' && (
-          <div className="istatistikler">
-              <div className="content-header">
-                <h1>Detaylı İstatistiklerim</h1>
-                <p className="content-subtitle">Performansınızı analiz edin ve gelişim alanlarını keşfedin</p>
-              </div>
-    
-            <div className="stat-filters">
-              <select>
-                <option key="7days">Son 7 gün</option>
-                <option key="30days">Son 30 gün</option>
-                <option key="3months">Son 3 ay</option>
-                <option key="1year">Son 1 yıl</option>
-                <option key="all">Tüm zamanlar</option>
-              </select>
-            </div>
+             <StatisticsDashboard />
             
-            <div className="stats-grid">
-              <div className="stat-box">
-                <h3>Paket İstatistikleri</h3>
-                <div className="stat-item">
-                  <span>Oluşturulan Paket:</span>
-                  <span>42</span>
-                </div>
-                <div className="stat-item">
-                  <span>Teslim Edilen:</span>
-                  <span>38</span>
-                </div>
-                <div className="stat-item">
-                  <span>İptal Edilen:</span>
-                  <span>4</span>
-                </div>
-                <div className="stat-item">
-                  <span>Teslim Oranı:</span>
-                  <span>90.5%</span>
-                </div>
-              </div>
-              
-              <div className="stat-box">
-                <h3>Finansal İstatistikler</h3>
-                <div className="stat-item">
-                  <span>Toplam Kazanç:</span>
-                  <span>₺1,230.50</span>
-                </div>
-                <div className="stat-item">
-                  <span>Ortalama Paket Fiyatı:</span>
-                  <span>₺32.40</span>
-                </div>
-                <div className="stat-item">
-                  <span>Ortalama İndirim Oranı:</span>
-                  <span>%58</span>
-                </div>
-              </div>
-              
-              <div className="stat-box">
-                <h3>Çevresel Etki</h3>
-                <div className="stat-item">
-                  <span>Kurtarılan Porsiyon:</span>
-                  <span>126</span>
-                </div>
-                <div className="stat-item">
-                  <span>Azaltılan CO₂:</span>
-                  <span>378 kg</span>
-                </div>
-                <div className="stat-item">
-                  <span>Eşdeğer Ağaç:</span>
-                  <span>15</span>
-                </div>
-              </div>
-              
-              <div className="stat-box">
-                <h3>Müşteri İstatistikleri</h3>
-                <div className="stat-item">
-                  <span>Müşteri Sayısı:</span>
-                  <span>27</span>
-                </div>
-                <div className="stat-item">
-                  <span>Ortalama Puan:</span>
-                  <span>4.8 / 5.0</span>
-                </div>
-                <div className="stat-item">
-                  <span>Tekrar Eden Müşteriler:</span>
-                  <span>68%</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="graph-container">
-              <h3>Paket Satış Grafiği (Son 30 Gün)</h3>
-              <div className="graph-placeholder" style={{ height: "250px", background: "#f2f2f2", display: "flex", justifyContent: "center", alignItems: "center" }}>
-                [Bu alana interaktif grafik eklenecek]
-              </div>
-            </div>
-            
-            <div className="download-stats">
-              <button className="btn-secondary">
-                <FaChartBar /> İstatistik Raporu İndir
-              </button>
-            </div>
-          </div>
         )}
 
 

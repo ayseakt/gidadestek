@@ -42,8 +42,16 @@ const UserProfile = sequelize.define('UserProfile', {
     defaultValue: DataTypes.NOW
   }
 }, {
-  tableName: 'user_profiles', // TABLO ADI VERİTABANINDAKİYLE BİREBİR AYNI OLMALI!
+  tableName: 'user_profiles',
   timestamps: false
 });
+
+// 🔗 İlişki tanımı - ALIAS DEĞİŞTİRİLDİ
+UserProfile.associate = (models) => {
+  UserProfile.belongsTo(models.User, {
+    foreignKey: 'user_id',
+    as: 'user' // 'profile' yerine 'user' kullanıldı
+  });
+};
 
 module.exports = UserProfile;

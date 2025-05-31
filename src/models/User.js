@@ -49,30 +49,24 @@ const User = sequelize.define('User', {
 
 // İlişkileri tanımlayalım
 User.associate = function(models) {
-  // Seller ile ilişki
+  console.log('🔗 User associations kuruluyor...');
+  
+  // UserProfile ile ilişki - EN ÖNEMLİSİ
+  if (models.UserProfile) {
+    User.hasOne(models.UserProfile, { 
+      foreignKey: 'user_id',
+      as: 'profile'
+    });
+    console.log('✅ User -> UserProfile (profile) ilişkisi kuruldu');
+  }
+  
+  // Seller ile ilişki - TEK ALIAS KULLAN
   if (models.Seller) {
     User.hasOne(models.Seller, { 
       foreignKey: 'user_id',
       as: 'seller'
     });
-  }
-  
-  // PaymentCard ile ilişki - SADECE MODEL VARSA KURULUYOR
-  if (models.PaymentCard) {
-    User.hasMany(models.PaymentCard, {
-      foreignKey: 'user_id',
-      as: 'paymentCards'
-    });
-    
-    // Varsayılan ödeme kartı için özel ilişki
-    User.hasOne(models.PaymentCard, {
-      foreignKey: 'user_id',
-      as: 'defaultPaymentCard',
-      scope: {
-        is_default: true,
-        is_active: true
-      }
-    });
+    console.log('✅ User -> Seller (seller) ilişkisi kuruldu');
   }
   
   // Location ile ilişki (eğer varsa)
@@ -89,6 +83,34 @@ User.associate = function(models) {
         is_default: true
       }
     });
+    console.log('✅ User -> Location ilişkileri kuruldu');
+  }
+  
+  // Order ile ilişki
+  if (models.Order) {
+    User.hasMany(models.Order, {
+      foreignKey: 'user_id',
+      as: 'orders'
+    });
+    console.log('✅ User -> Order ilişkisi kuruldu');
+  }
+  
+  // CartItem ile ilişki
+  if (models.CartItem) {
+    User.hasMany(models.CartItem, {
+      foreignKey: 'user_id',
+      as: 'cartItems'
+    });
+    console.log('✅ User -> CartItem ilişkisi kuruldu');
+  }
+  
+  // Review ile ilişki
+  if (models.Review) {
+    User.hasMany(models.Review, {
+      foreignKey: 'user_id',
+      as: 'reviews'
+    });
+    console.log('✅ User -> Review ilişkisi kuruldu');
   }
 };
 

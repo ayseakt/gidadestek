@@ -140,7 +140,7 @@ const orders = await Order.findAndCountAll({
       include: [
         {
           model: UserProfile,
-          as: 'UserProfile', // ✅ DEĞİŞTİRİLDİ: 'profile' -> 'UserProfile'
+          as: 'profile', // ✅ DEĞİŞTİRİLDİ: 'profile' -> 'UserProfile'
           attributes: [ 'first_name', 'last_name']
         }
       ]
@@ -243,7 +243,7 @@ const order = await Order.findOne({
       include: [
         {
           model: UserProfile,
-          as: 'UserProfile', // ✅ DEĞİŞTİRİLDİ: 'profile' -> 'UserProfile'
+          as: 'profile', // ✅ DEĞİŞTİRİLDİ: 'profile' -> 'UserProfile'
           attributes: [ 'first_name', 'last_name']
         }
       ]
@@ -736,7 +736,7 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
           model: Seller, 
           as: 'seller',
           required: false,
-          attributes: ['seller_id', 'business_name', 'phone_number']
+          attributes: ['seller_id', 'business_name']
         }
       ],
       limit: parseInt(limit),

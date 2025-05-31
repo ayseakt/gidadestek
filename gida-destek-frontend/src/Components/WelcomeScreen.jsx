@@ -145,28 +145,16 @@ const WelcomeScreen = ({ onComplete }) => {
     >
       <div className="welcome-content">
         {/* Logo için temporari çözüm */}
-        <div className="welcome-logo">SofraPay Logo</div>
+                  <img 
+            src="/logo1.png" 
+            alt="SofraPay Logo" 
+            style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+            
+          />
         <h1>Lezzetli yemekler <span className="highlight">dakikalar içinde</span> kapınızda!</h1>
         <p>En sevdiğiniz restoran ve marketlerin lezzetli ürünleri SofraPay ile çok yakınınızda.</p>
         
-        <div className="food-illustrations">
-          {/* Geçici olarak animasyonları kaldıralım */}
-          <img 
-            src="/images/illustration-1.png" 
-            alt="" 
-            className="food-ill food-ill-1"
-          />
-          <img 
-            src="/images/illustration-2.png" 
-            alt="" 
-            className="food-ill food-ill-2"
-          />
-          <img 
-            src="/images/illustration-3.png" 
-            alt="" 
-            className="food-ill food-ill-3"
-          />
-        </div>
+
         
         <div className="welcome-buttons">
           <button 
