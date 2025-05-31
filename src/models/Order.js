@@ -147,24 +147,69 @@ module.exports = (sequelize, DataTypes) => {
         });
       },
       
-      afterCreate: (order, options) => {
+      afterCreate: async (order, options) => {
         console.log('✅ Sipariş başarıyla oluşturuldu:', {
           orderId: order.order_id,
           confirmationCode: order.confirmationCode,
           userId: order.user_id,
           sellerId: order.seller_id
         });
+        
+        // 🎯 YENİ SİPARİŞ BİLDİRİMİ GÖNDER
+        try {
+          const OrderNotificationService = require('../services/OrderNotificationService');
+          await OrderNotificationService.notifyNewOrder(order);
+        } catch (error) {
+          console.error('❌ Yeni sipariş bildirimi gönderilemedi:', error);
+          // Bildirim hatası siparişi iptal etmez, sadece loglanır
+        }
       },
       
-      afterUpdate: (order, options) => {
-        // Durum değişikliklerini logla
+      beforeUpdate: (order, options) => {
+        // Değişiklikleri takip et
+        if (order.changed()) {
+          console.log('📝 Sipariş güncelleniyor:', {
+            orderId: order.order_id,
+            changes: order.changed()
+          });
+        }
+      },
+      
+      afterUpdate: async (order, options) => {
+        // Durum değişikliklerini kontrol et ve bildirim gönder
         if (order.changed('order_status')) {
+          const oldStatus = order._previousDataValues.order_status;
+          const newStatus = order.order_status;
+          
           console.log('📦 Sipariş durumu değişti:', {
             orderId: order.order_id,
             code: order.confirmationCode,
-            oldStatus: order._previousDataValues.order_status,
-            newStatus: order.order_status
+            oldStatus,
+            newStatus
           });
+          
+          // 🎯 DURUM DEĞİŞİKLİĞİ BİLDİRİMİ GÖNDER
+          try {
+            const OrderNotificationService = require('../services/OrderNotificationService');
+            await OrderNotificationService.notifyOrderStatusChange(order, oldStatus, newStatus);
+          } catch (error) {
+            console.error('❌ Durum değişikliği bildirimi gönderilemedi:', error);
+          }
+        }
+        
+        // Onay kodu yenilenme bildirimi
+        if (order.changed('confirmationCode')) {
+          console.log('🔄 Onay kodu değişti:', {
+            orderId: order.order_id,
+            newCode: order.confirmationCode
+          });
+          
+          try {
+            const OrderNotificationService = require('../services/OrderNotificationService');
+            await OrderNotificationService.notifyCodeRegenerated(order);
+          } catch (error) {
+            console.error('❌ Onay kodu bildirimi gönderilemedi:', error);
+          }
         }
       }
     }
@@ -217,21 +262,26 @@ module.exports = (sequelize, DataTypes) => {
   // 🎯 INSTANCE METHODS
   
   // Onay kodunu yenile
-  Order.prototype.regenerateConfirmationCode = async function() {
-    console.log('🔄 Onay kodu yenileniyor...', this.order_id);
-    
-    this.confirmationCode = await generateUniqueConfirmationCode(Order);
-    this.codeGeneratedAt = new Date();
-    this.codeUsedAt = null; // Önceki kullanım kaydını sıfırla
-    this.codeUsedBy = null;
-    
-    console.log('🔄 Onay kodu yenilendi:', {
-      orderId: this.order_id,
-      newCode: this.confirmationCode
-    });
-    
-    return await this.save();
-  };
+Order.prototype.regenerateConfirmationCode = async function() {
+  console.log('🔄 Onay kodu yenileniyor...', this.order_id);
+  
+  const oldCode = this.confirmationCode;
+  this.confirmationCode = await generateUniqueConfirmationCode(Order);
+  this.codeGeneratedAt = new Date();
+  this.codeUsedAt = null; // Önceki kullanım kaydını sıfırla
+  this.codeUsedBy = null;
+  
+  console.log('🔄 Onay kodu yenilendi:', {
+    orderId: this.order_id,
+    oldCode,
+    newCode: this.confirmationCode
+  });
+  
+  const savedOrder = await this.save();
+  
+  // Hook otomatik çalışacak, manuel bildirim göndermeye gerek yok
+  return savedOrder;
+};
 
   // Siparişi onay kodu ile teslim et
   Order.prototype.deliverWithCode = async function(inputCode, sellerId) {

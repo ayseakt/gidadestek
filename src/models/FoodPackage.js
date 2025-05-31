@@ -105,7 +105,49 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'food_packages',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    hooks: {
+      afterCreate: async (foodPackage, options) => {
+        console.log('✅ Yeni paket oluşturuldu:', {
+          packageId: foodPackage.package_id,
+          packageName: foodPackage.package_name,
+          sellerId: foodPackage.seller_id,
+          price: foodPackage.discounted_price
+        });
+        
+        // 🎯 YENİ PAKET BİLDİRİMİ GÖNDER
+        try {
+          const OrderNotificationService = require('../services/OrderNotificationService');
+          await OrderNotificationService.notifyNewPackage(foodPackage);
+        } catch (error) {
+          console.error('❌ Yeni paket bildirimi gönderilemedi:', error);
+          // Bildirim hatası paketi iptal etmez
+        }
+      },
+      
+      afterUpdate: async (foodPackage, options) => {
+        // Paket aktif hale geldiğinde bildirim gönder
+        if (foodPackage.changed('is_active') && foodPackage.is_active === 1) {
+          console.log('📦 Paket aktif hale geldi:', foodPackage.package_id);
+          
+          try {
+            const OrderNotificationService = require('../services/OrderNotificationService');
+            await OrderNotificationService.notifyNewPackage(foodPackage);
+          } catch (error) {
+            console.error('❌ Paket aktivasyon bildirimi gönderilemedi:', error);
+          }
+        }
+        
+        // Paket iptal edildiğinde (örnek)
+        if (foodPackage.changed('is_active') && foodPackage.is_active === 0) {
+          console.log('❌ Paket pasif hale geldi:', {
+            packageId: foodPackage.package_id,
+            reason: foodPackage.cancellation_reason
+          });
+          // İsteğe bağlı: İptal bildirimi de gönderebilirsiniz
+        }
+      }
+    }
   });
 
   FoodPackage.associate = function(models) {

@@ -211,32 +211,60 @@ const fetchOrders = async (showLoader = true) => {
     
 if (data.success) {
   console.log('✅ Siparişler başarıyla getirildi:', data.orders);
-  
+  console.log('🔍 İlk sipariş raw data:', JSON.stringify(data.orders[0], null, 2));
   // Backend'den gelen veriyi frontend formatına çevir - seller_id EKLENDİ
-  const formattedOrders = (data.orders || []).map(order => ({
-    id: order.id,
-    seller_id: order.seller_id || order.sellerId || order.seller?.id, // ✅ Satıcı ID'si eklendi
-    storeName: order.sellerName || order.seller || order.seller?.business_name || 'İş Yeri Adı Belirtilmemiş',
-    productName: order.productName || order.orderName || 
-                        (order.items && order.items.length > 0 ? 
-                         order.items.map(item => item.name).join(', ') : 'Ürün Adı Yok'),
-    price: parseFloat(order.price || order.totalAmount || order.total_amount || 0),
-    originalPrice: parseFloat(order.originalPrice || order.price || order.totalAmount || order.total_amount || 0),
-    orderDate: order.createdAt || order.orderDate || new Date().toISOString(),
-    pickupDate: order.pickupDate || order.createdAt || new Date().toISOString(),
-    status: order.status === 'yeni' ? 'devam_ediyor' : order.status,
-    address: order.address || order.seller?.address || 'Adres bilgisi yok',
-    confirmationCode: order.confirmationCode,
-    trackingNumber: order.trackingNumber || `SPY${(order.id || order.order_id || '').toString().padStart(8, '0')}`,
-    storeImage: order.storeImage || '/default-store.png',
-    items: order.items || [{ 
-      name: order.productName || order.orderName || 'Ürün', 
-      quantity: 1, 
-      price: order.price || order.totalAmount || 0 
-    }],
-    hasReview: order.hasReview || false,
-    package_id: order.package_id // Yorum için gerekli
-  }));
+  const formattedOrders = (data.orders || []).map(order => {
+    
+    // Seller ID'yi farklı yollardan al - daha kapsamlı kontrol
+  const seller = order.seller; // Backend'de 'as: seller' olarak tanımlandığı için
+  
+  // Seller ID kontrolü - sadece doğru yoldan al
+  const sellerId = seller?.seller_id || null;
+  
+  // Debugging için (geliştirme aşamasında)
+  if (!sellerId) {
+    console.error('❌ Seller ID bulunamadı:', {
+      orderStructure: {
+        id: order.id,
+        seller: order.seller,
+        seller_id_in_seller: order.seller?.seller_id
+      }
+    });
+  }
+    
+    return {
+      id: order.id,
+      seller_id: sellerId, // ✅ Düzeltilmiş seller_id mapping
+      storeName: order.sellerName || 
+                 order.seller || 
+                 (order.seller && order.seller.business_name) || 
+                 (order.Seller && order.Seller.business_name) ||
+                 'İş Yeri Adı Belirtilmemiş',
+      productName: order.productName || 
+                   order.orderName || 
+                   (order.items && order.items.length > 0 ? 
+                    order.items.map(item => item.name).join(', ') : 'Ürün Adı Yok'),
+      price: parseFloat(order.price || order.totalAmount || order.total_amount || 0),
+      originalPrice: parseFloat(order.originalPrice || order.price || order.totalAmount || order.total_amount || 0),
+      orderDate: order.createdAt || order.orderDate || new Date().toISOString(),
+      pickupDate: order.pickupDate || order.createdAt || new Date().toISOString(),
+      status: order.status === 'yeni' ? 'devam_ediyor' : order.status,
+      address: order.address || 
+               (order.seller && order.seller.address) || 
+               (order.Seller && order.Seller.address) ||
+               'Adres bilgisi yok',
+      confirmationCode: order.confirmationCode,
+      trackingNumber: order.trackingNumber || `SPY${(order.id || order.order_id || '').toString().padStart(8, '0')}`,
+      storeImage: order.storeImage || '/default-store.png',
+      items: order.items || [{ 
+        name: order.productName || order.orderName || 'Ürün', 
+        quantity: 1, 
+        price: order.price || order.totalAmount || 0 
+      }],
+      hasReview: order.hasReview || false,
+      package_id: order.package_id || (order.package && order.package.id) // Yorum için gerekli
+    };
+  });
   
   console.log('🔄 Formatlanmış siparişler:', formattedOrders);
   setOrders(formattedOrders);
@@ -285,19 +313,35 @@ if (data.success) {
   // Yorum gönderme
 // Yorum gönderme - DÜZELTİLMİŞ VERSİYON
 const submitReview = async () => {
-  if (!reviewOrder) return;
-  
+  if (!reviewOrder){
+      console.error('❌ Review order bulunamadı');
+    return;
+  }
   try {
     setSubmittingReview(true);
     const token = localStorage.getItem('token');
     const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5051';
+    const sellerId = reviewOrder.seller_id || reviewOrder.sellerId;
+    console.log('🔍 Review için seller bilgileri:', {
+      'reviewOrder.seller_id': reviewOrder.seller_id,
+      'reviewOrder.sellerId': reviewOrder.sellerId,
+      'sellerId': sellerId,
+      'reviewOrder': reviewOrder
+    });
     
+    if (!sellerId) {
+      console.error('❌ Seller ID bulunamadı:', reviewOrder);
+      throw new Error(`Satıcı bilgisi bulunamadı. 
+        Order ID: ${reviewOrder.id}
+        Store Name: ${reviewOrder.storeName}
+        Lütfen sayfayı yeniden yükleyin veya destek ekibiyle iletişime geçin.`);
+    }
     // Backend'e gönderilecek veri - EKSİK ALANLAR EKLENDİ
     const reviewPayload = {
+      seller_id: sellerId, // ✅ Zorunlu alan
+      rating: parseInt(reviewData.rating),
       order_id: reviewOrder.id,
       package_id: reviewOrder.package_id,
-      seller_id: reviewOrder.seller_id || reviewOrder.sellerId, // ✅ Satıcı ID eklendi
-      rating: reviewData.rating, // ✅ Genel puan (zorunlu)
       overall_rating: reviewData.rating, // ✅ Backend'in beklediği alan adı farklı olabilir
       comment: reviewData.comment,
       food_quality_rating: reviewData.food_quality_rating,
@@ -306,7 +350,23 @@ const submitReview = async () => {
       is_anonymous: reviewData.is_anonymous
     };
 
-    console.log('📤 Yorum gönderiliyor:', reviewPayload);
+        // Payload'ı konsola yazdır - DEBUG
+    console.log('📤 Yorum gönderiliyor:', {
+      ...reviewPayload,
+      'reviewOrder.seller_id': reviewOrder.seller_id,
+      'reviewOrder.sellerId': reviewOrder.sellerId,
+      'reviewOrder.id': reviewOrder.id,
+      'reviewData.rating': reviewData.rating
+    });
+    
+    // Kritik alanları tekrar kontrol et
+    if (!reviewPayload.seller_id || !reviewPayload.rating) {
+      console.error('❌ Kritik alanlar eksik:', {
+        seller_id: reviewPayload.seller_id,
+        rating: reviewPayload.rating
+      });
+      throw new Error('Satıcı ID veya puan bilgisi eksik');
+    }
     
     const response = await fetch(`${baseUrl}/api/reviews/create`, {
       method: 'POST',

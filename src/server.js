@@ -36,7 +36,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes'); 
-
+const notificationRoutes = require('./routes/notificationRoutes');
 // ✅ API route'larını doğru sırada tanımla
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -48,6 +48,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/seller-locations', locationRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/notifications', notificationRoutes);
 // ✅ Test endpoint'i ekle
 app.get('/api/test', (req, res) => {
   res.json({ success: true, message: 'API çalışıyor', timestamp: new Date().toISOString() });

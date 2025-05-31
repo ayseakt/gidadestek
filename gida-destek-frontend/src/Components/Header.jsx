@@ -13,7 +13,8 @@ import {
   FaShoppingCart,
   FaTrash
 } from 'react-icons/fa';
-
+import NotificationCenter from './NotificationCenter';
+import useNotification from '../hooks/useNotification';
 import MyOrders from './MyOrders';
 import AddressButton from './AddressButton';
 import authService from '../services/AuthService';
@@ -21,6 +22,8 @@ import { getUserProfile, getSellerProfile } from '../services/userService';
 import { useCart } from '../contexts/cartContext';
 
 function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { unreadCount } = useNotification(null);
   const [showProfileWarning, setShowProfileWarning] = useState(false);
   const [showCreateSellerProfile, setShowCreateSellerProfile] = useState(false);
   const navigate = useNavigate();
@@ -44,6 +47,10 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
     return savedMode === 'true';
   });
   const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [userId, setUserId] = useState(() => {
+    const user = authService.getUser();
+    return user?.id || user?.userId || null;
+  });
 
   // Yiyecek isimlerini arama için örnek liste
   const foodItems = [
@@ -359,50 +366,23 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
           
           {/* Bildirim butonu */}
           <div className="notification-button-wrapper">
-            <div className="notification-button" onClick={handleNotificationsClick}>
+            <div 
+              className="notification-button" 
+              onClick={() => setShowNotifications(!showNotifications)}
+            >
               <FaBell />
-              {notificationCount > 0 && (
-                <span className="notification-badge">{notificationCount}</span>
+              {unreadCount > 0 && (
+                <span className="notification-badge">{unreadCount}</span>
               )}
             </div>
-
-            {notificationMenuOpen && (
-              <div className="notification-menu">
-                <div className="notification-header">
-                  <h3>Bildirimler</h3>
-                </div>
-                <ul className="notification-list">
-                  <li className="notification-item">
-                    <div className="notification-icon"><FaLeaf /></div>
-                    <div className="notification-content">
-                      <div className="notification-title">Paketiniz Hazır!</div>
-                      <div className="notification-message">Ada Market'ten ayırdığınız paket hazır.</div>
-                      <div className="notification-time">10 dakika önce</div>
-                    </div>
-                  </li>
-                  <li className="notification-item">
-                    <div className="notification-icon"><FaLeaf /></div>
-                    <div className="notification-content">
-                      <div className="notification-title">Teşekkürler!</div>
-                      <div className="notification-message">Bugün 2 paket daha kurtardınız.</div>
-                      <div className="notification-time">1 saat önce</div>
-                    </div>
-                  </li>
-                  <li className="notification-item">
-                    <div className="notification-icon"><FaLeaf /></div>
-                    <div className="notification-content">
-                      <div className="notification-title">Yeni Kampanya!</div>
-                      <div className="notification-message">Yakınınızdaki fırınlarda %50 indirim.</div>
-                      <div className="notification-time">3 saat önce</div>
-                    </div>
-                  </li>
-                </ul>
-                <div className="notification-footer">
-                  <button className="view-all-button">Tümünü Gör</button>
-                </div>
-              </div>
-            )}
           </div>
+
+
+          <NotificationCenter
+            userId={userId}
+            isOpen={showNotifications}
+            onClose={() => setShowNotifications(false)}
+          />
           
           {/* Sepet butonu */}
           {!isDonorMode && (
