@@ -741,15 +741,18 @@ const Home = () => {
   };
 };
 
-  const validRealPackages = realPackages
-    .map(convertRealPackageToBusinessFormat)
-    .filter(business => {
-      if (business === null) return false;
-      if (business.actualDistance > MAX_DISTANCE_KM) {
-        return false;
-      }
-      return true;
-    });
+  const validRealPackages = React.useMemo(() => {
+    return realPackages
+      .map(convertRealPackageToBusinessFormat)
+      .filter(business => {
+        if (business === null) return false;
+        if (userLocation && business.actualDistance > MAX_DISTANCE_KM) {
+          return false;
+        }
+        return true;
+      });
+  }, [realPackages, userLocation]);
+
 
   // Filtreleme
   const filteredBusinesses = selectedCategory === 'Tümü'
@@ -900,10 +903,7 @@ useEffect(() => {
       }
 
       // 5. Paket ve sepet verilerini paralel yükle
-      await Promise.all([
-        loadRealPackages().catch(err => console.error('📦 Paket yükleme hatası:', err)),
-        loadCartCount().catch(err => console.error('🛒 Sepet sayısı hatası:', err))
-      ]);
+    await loadCartCount();
     } catch (error) {
       console.error('🔥 Uygulama başlatılırken genel hata:', error);
     } finally {
@@ -931,6 +931,12 @@ useEffect(() => {
       loadCart();
     }
   }, [showCart]);
+  useEffect(() => {
+  if (userLocation) {
+    loadRealPackages();
+  }
+}, [userLocation]);
+
 // Loading state kontrolü
 if (isInitializing) {
   console.log('🔄 Uygulama yükleniyor...');

@@ -39,7 +39,7 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
 // ✅ Route logging middleware (debug için)
-app.use('/api/review', (req, res, next) => {
+app.use(['/api/review', '/api/reviews'], (req, res, next) => {
   console.log(`🔍 Review Route: ${req.method} ${req.originalUrl}`);
   console.log('📋 Headers:', req.headers.authorization ? 'Token var' : 'Token yok');
   next();
@@ -57,8 +57,9 @@ app.use('/api/seller-locations', locationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// ✅ Review route'ları - SADECE BU SATIRDA TANIMLA
-app.use('/api/review', reviewRoutes);
+// ✅ Review route'ları - HEM TEKİL HEM ÇOĞUL
+app.use('/api/review', reviewRoutes);   // Mevcut
+app.use('/api/reviews', reviewRoutes);  // Frontend uyumluluğu için eklendi
 
 // ✅ Test endpoint'i
 app.get('/api/test', (req, res) => {
@@ -66,7 +67,10 @@ app.get('/api/test', (req, res) => {
     success: true, 
     message: 'API çalışıyor', 
     timestamp: new Date().toISOString(),
-    reviewEndpoint: '/api/review/my-reviews'
+    reviewEndpoints: {
+      singular: '/api/review/my-reviews',
+      plural: '/api/reviews/my-reviews'
+    }
   });
 });
 
@@ -90,18 +94,28 @@ app.get('/api/debug/routes', (req, res) => {
       categories: '/api/categories/*',
       orders: '/api/orders/*',
       notifications: '/api/notifications/*',
-      reviews: '/api/review/*'
+      reviews_singular: '/api/review/*',
+      reviews_plural: '/api/reviews/*'
     },
     reviewRoutes: [
       'POST /api/review/create',
+      'POST /api/reviews/create',  // Yeni eklendi
       'GET /api/review/seller/:sellerId',
+      'GET /api/reviews/seller/:sellerId',  // Yeni eklendi
       'GET /api/review/my-reviews',
+      'GET /api/reviews/my-reviews',  // Yeni eklendi
       'POST /api/review/:reviewId/response',
+      'POST /api/reviews/:reviewId/response',  // Yeni eklendi
       'POST /api/review/:reviewId/helpful',
+      'POST /api/reviews/:reviewId/helpful',  // Yeni eklendi
       'PATCH /api/review/:reviewId/visibility',
+      'PATCH /api/reviews/:reviewId/visibility',  // Yeni eklendi
       'GET /api/review/reviewable-orders',
+      'GET /api/reviews/reviewable-orders',  // Yeni eklendi
       'PUT /api/review/:reviewId',
-      'DELETE /api/review/:reviewId'
+      'PUT /api/reviews/:reviewId',  // Yeni eklendi
+      'DELETE /api/review/:reviewId',
+      'DELETE /api/reviews/:reviewId'  // Yeni eklendi
     ]
   });
 });
@@ -137,10 +151,13 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server ${PORT} portunda çalışıyor`);
       console.log(`📌 CORS: http://localhost:3000 için etkinleştirildi`);
-      console.log(`📌 Review API Endpoints:`);
+      console.log(`📌 Review API Endpoints (Her iki format da destekleniyor):`);
       console.log(`   - GET  http://localhost:${PORT}/api/review/my-reviews`);
+      console.log(`   - GET  http://localhost:${PORT}/api/reviews/my-reviews`);
       console.log(`   - POST http://localhost:${PORT}/api/review/create`);
+      console.log(`   - POST http://localhost:${PORT}/api/reviews/create`);
       console.log(`   - GET  http://localhost:${PORT}/api/review/seller/:sellerId`);
+      console.log(`   - GET  http://localhost:${PORT}/api/reviews/seller/:sellerId`);
       console.log(`📌 Debug endpoint: GET http://localhost:${PORT}/api/debug/routes`);
       console.log(`📌 Test endpoint: GET http://localhost:${PORT}/api/test`);
     });

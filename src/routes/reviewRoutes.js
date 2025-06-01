@@ -27,7 +27,7 @@ router.get('/reviewable-orders', authMiddleware, ReviewController.getReviewableO
 // ✅ Yorum güncelleme
 router.put('/:reviewId', authMiddleware, ReviewController.updateReview);
 
-// ✅ Yorum silme
-router.delete('/:reviewId', authMiddleware, ReviewController.deleteReview);
+
+
 
 module.exports = router;

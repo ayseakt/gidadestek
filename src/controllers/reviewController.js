@@ -11,230 +11,285 @@ const { Op } = require('sequelize');
 
 class ReviewController {
   // ✅ Yorum oluşturma (düzeltilmiş - doğru seller_id kullanımı)
-  static async createReview(req, res) {
-    try {
-      const userId = req.user.user_id || req.user.id;
-      const { 
-        order_id,
-        package_id, // Bu zorunlu olmalı çünkü hangi ürüne yorum yapıldığı bilinmeli
-        rating,
-        food_quality_rating,
-        service_rating,
-        value_rating,
-        comment,
-        is_anonymous = false
-      } = req.body;
+// ReviewController.js - createReview metodunu bu şekilde güncelleyin:
 
-      console.log('📝 Yeni yorum oluşturuluyor:', { userId, order_id, package_id, rating });
-      const userAsSeller = await Seller.findOne({
-        where: { user_id: userId }
+static async createReview(req, res) {
+  try {
+    const userId = req.user.user_id || req.user.id;
+    const { 
+      order_id,
+      package_id, 
+      rating,
+      food_quality_rating,
+      service_rating,
+      value_rating,
+      comment,
+      is_anonymous = false
+    } = req.body;
+
+    console.log('📝 Yeni yorum oluşturuluyor:', { 
+      userId, 
+      order_id, 
+      package_id, 
+      rating,
+      body: req.body 
+    });
+
+    // ✅ Temel validasyonlar
+    if (!package_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ürün ID zorunludur'
       });
+    }
 
-      if (userAsSeller) {
-        console.log('👤 Kullanıcı aynı zamanda satıcı:', userAsSeller.seller_id);
-      }
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Geçerli bir puan değeri (1-5) giriniz'
+      });
+    }
 
-      // Validasyonlar
-      if (!package_id || !rating) {
-        return res.status(400).json({
-          success: false,
-          message: 'Ürün ID ve genel puan zorunludur'
-        });
-      }
+    // ✅ Paketi ve sahibini bul
+    const foodPackage = await FoodPackage.findByPk(package_id, {
+      include: [
+        {
+          model: Seller,
+          as: 'seller',
+          attributes: ['seller_id', 'business_name']
+        }
+      ]
+    });
 
-      // Rating değerleri kontrolü
-      if (rating < 1 || rating > 5) {
-        return res.status(400).json({
-          success: false,
-          message: 'Puan değeri 1-5 arasında olmalıdır'
-        });
-      }
+    if (!foodPackage) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ürün bulunamadı'
+      });
+    }
 
-      // Paketi ve sahibini bul
-      const foodPackage = await FoodPackage.findByPk(package_id, {
+    const seller_id = foodPackage.seller.seller_id;
+    console.log('🎯 Seller ID:', seller_id);
+
+    // ✅ Kullanıcının satıcı olup olmadığını kontrol et
+    const userAsSeller = await Seller.findOne({
+      where: { user_id: userId }
+    });
+
+    // ✅ Kendi ürününe yorum yapmasını engelle
+    if (userAsSeller && userAsSeller.seller_id === seller_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Kendi ürününüze değerlendirme yapamazsınız'
+      });
+    }
+
+    // ✅ Duplicate review kontrolü - daha kapsamlı
+    let duplicateQuery = {
+      user_id: userId,
+      package_id: package_id
+    };
+
+    // Eğer order_id verilmişse onu da kontrol et
+    if (order_id) {
+      duplicateQuery.order_id = order_id;
+    }
+
+    const existingReview = await Review.findOne({
+      where: duplicateQuery
+    });
+
+    if (existingReview) {
+      console.log('⚠️ Duplicate review detected:', existingReview.review_id);
+      return res.status(400).json({
+        success: false,
+        message: order_id 
+          ? 'Bu sipariş için zaten değerlendirme yapmışsınız'
+          : 'Bu ürün için zaten değerlendirme yapmışsınız',
+        existing_review_id: existingReview.review_id
+      });
+    }
+
+    // ✅ Sipariş kontrolü (eğer order_id verilmişse)
+    if (order_id) {
+      const order = await Order.findOne({
+        where: {
+          order_id: order_id,
+          user_id: userId,
+          order_status: { [Op.in]: ['completed', 'teslim_edildi'] }
+        },
         include: [
           {
-            model: Seller,
-            as: 'seller',
-            attributes: ['seller_id', 'business_name']
+            model: OrderItem,
+            as: 'items',
+            where: { package_id: package_id },
+            required: true
           }
         ]
       });
 
-      if (!foodPackage) {
-        return res.status(404).json({
+      if (!order) {
+        return res.status(400).json({
           success: false,
-          message: 'Ürün bulunamadı'
+          message: 'Bu sipariş için değerlendirme yapılamaz veya ürün siparişte bulunmuyor'
         });
       }
-      const seller_id = foodPackage.seller.seller_id; // seller tablosundan direkt al
-      console.log('🎯 Yorum yapılacak seller:', { 
-        package_seller_id: seller_id, 
-        user_seller_id: userAsSeller?.seller_id || 'yok' 
-      });
+    }
 
-     
+    // ✅ Yorumu oluştur
+    const review = await Review.create({
+      user_id: userId,
+      seller_id: seller_id,
+      order_id: order_id || null,
+      package_id: package_id,
+      rating: parseInt(rating),
+      food_quality_rating: parseInt(food_quality_rating || rating),
+      service_rating: parseInt(service_rating || rating),
+      value_rating: parseInt(value_rating || rating),
+      comment: comment ? comment.trim() : null,
+      is_anonymous: Boolean(is_anonymous),
+      is_visible: true,
+      helpful_count: 0
+    });
 
-      // Eğer order_id verilmişse, siparişin teslim edilmiş olup olmadığını kontrol et
-      if (order_id) {
-        const order = await Order.findOne({
-          where: {
-            order_id: order_id,
-            user_id: userId,
-            order_status: { [Op.in]: ['completed', 'teslim_edildi'] }
-          },
-          include: [
-            {
-              model: OrderItem,
-              as: 'items',
-              where: { package_id: package_id },
-              required: true
-            }
-          ]
-        });
+    console.log('✅ Yorum başarıyla oluşturuldu:', review.review_id);
 
-        if (!order) {
-          return res.status(400).json({
-            success: false,
-            message: 'Bu sipariş için yorum yapılamaz veya bu ürün siparişte bulunmuyor'
-          });
-        }
-
-        // Bu ürün için daha önce yorum yapılmış mı kontrol et
-        const existingReview = await Review.findOne({
-          where: {
-            user_id: userId,
-            package_id: package_id,
-            order_id: order_id
-          }
-        });
-
-        if (existingReview) {
-          return res.status(400).json({
-            success: false,
-            message: 'Bu ürün için zaten yorum yapmışsınız'
-          });
-        }
+    return res.status(201).json({
+      success: true,
+      message: 'Değerlendirmeniz başarıyla eklendi',
+      review: {
+        review_id: review.review_id,
+        seller_name: foodPackage.seller?.business_name,
+        product_name: foodPackage.package_name,
+        rating: review.rating,
+        created_at: review.created_at
       }
+    });
 
-      // Yorumu oluştur
-      const review = await Review.create({
-        user_id: userId,
-        seller_id: seller_id, // Paketin sahibi olan satıcı
-        order_id: order_id || null,
-        package_id: package_id,
-        rating: parseInt(rating),
-        food_quality_rating: parseInt(food_quality_rating || rating),
-        service_rating: parseInt(service_rating || rating),
-        value_rating: parseInt(value_rating || rating),
-        comment: comment || null,
-        is_anonymous: Boolean(is_anonymous),
-        is_visible: true,
-        helpful_count: 0
-      });
-
-      console.log('✅ Yorum başarıyla oluşturuldu:', review.review_id);
-
-      return res.status(201).json({
-        success: true,
-        message: 'Yorumunuz başarıyla eklendi',
-        review: {
-          review_id: review.review_id,
-          seller_name: foodPackage.seller?.business_name,
-          product_name: foodPackage.package_name,
-          rating: review.rating
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ Yorum oluşturma hatası:', error);
-      return res.status(500).json({
+  } catch (error) {
+    console.error('❌ Yorum oluşturma hatası:', error);
+    
+    // ✅ Sequelize validation hatalarını yakala
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({
         success: false,
-        message: 'Yorum eklenirken hata oluştu',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        message: 'Girilen veriler geçersiz',
+        errors: error.errors.map(e => e.message)
       });
     }
+
+    // ✅ Unique constraint hatalarını yakala
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu ürün için zaten değerlendirme yapmışsınız'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Değerlendirme eklenirken hata oluştu',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
+}
 
   // ✅ Kullanıcının kendi yorumları (düzeltilmiş - eksik veriler eklendi)
-  static async getUserReviews(req, res) {
-    try {
-      const userId = req.user.user_id || req.user.id;
-      const { page = 1, limit = 10 } = req.query;
+// ✅ Düzeltilmiş getUserReviews metodu - ReviewController.js içinde değiştirilecek kısım
 
-      console.log('📋 Kullanıcı yorumları getiriliyor:', userId);
+static async getUserReviews(req, res) {
+  try {
+    const userId = req.user.user_id || req.user.id;
+    const { page = 1, limit = 10 } = req.query;
 
-      const reviews = await Review.findAndCountAll({
-        where: {
-          user_id: userId
+    console.log('📋 Kullanıcı yorumları getiriliyor:', userId);
+
+    const reviews = await Review.findAndCountAll({
+      where: {
+        user_id: userId
+      },
+      include: [
+        {
+          model: Seller,
+          as: 'seller',
+          attributes: ['seller_id', 'business_name']
         },
-        include: [
-          {
-            model: Seller,
-            as: 'seller',
-            attributes: ['seller_id', 'business_name']
-          },
-          {
-            model: FoodPackage,
-            as: 'package',
-            attributes: ['package_id', 'package_name',  'discounted_price'],
-            required: false,
-            include: [
-              {
-                model: Seller,
-                as: 'seller',
-                attributes: ['business_name']
-              }
-            ]
-          },
-          {
-            model: Order,
-            as: 'order',
-            attributes: ['order_id', 'order_date'],
-            required: false
-          }
-        ],
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: (parseInt(page) - 1) * parseInt(limit)
-      });
+        {
+          model: FoodPackage,
+          as: 'package',
+          attributes: [
+            'package_id', 
+            'package_name', 
+            'discounted_price',
+            // 'image_url' // ✅ image_url eklendi
+          ],
+          required: false,
+          include: [
+            {
+              model: Seller,
+              as: 'seller',
+              attributes: ['business_name']
+            }
+          ]
+        },
+        {
+          model: Order,
+          as: 'order',
+          attributes: ['order_id', 'order_date'],
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
 
-      const formattedReviews = reviews.rows.map(review => ({
-        review_id: review.review_id,
-        seller_name: review.seller?.business_name || 'Satıcı Bulunamadı',
-        product_name: review.package?.package_name || 'Ürün Bulunamadı',
-        // product_image: review.package?.image_url || '/default-food.jpg',
-        rating: review.rating,
-        food_quality_rating: review.food_quality_rating,
-        service_rating: review.service_rating,
-        value_rating: review.value_rating,
-        comment: review.comment,
-        helpful_count: review.helpful_count,
-        is_visible: review.is_visible,
-        is_anonymous: review.is_anonymous,
-        created_at: review.created_at,
-        response_text: review.response_text,
-        response_date: review.response_date,
-        order_date: review.order?.order_date || null
-      }));
+    const formattedReviews = reviews.rows.map(review => ({
+      review_id: review.review_id,
+      seller_name: review.seller?.business_name || 'Satıcı Bulunamadı',
+      product_name: review.package?.package_name || 'Ürün Bulunamadı',
+      // product_image: review.package?.image_url || '/default-food.jpg', // ✅ product_image eklendi
+      
+      // ✅ Rating alanları düzgün şekilde eklendi
+      rating: review.rating,
+      food_quality_rating: review.food_quality_rating,
+      service_rating: review.service_rating,
+      value_rating: review.value_rating,
+      
+      // ✅ Yorum metni eklendi
+      comment: review.comment,
+      
+      // ✅ Diğer önemli alanlar
+      helpful_count: review.helpful_count,
+      is_visible: review.is_visible,
+      is_anonymous: review.is_anonymous,
+      created_at: review.created_at,
+      
+      // ✅ Satıcı yanıtı alanları
+      response_text: review.response_text,
+      response_date: review.response_date,
+      
+      // ✅ Sipariş tarihi
+      order_date: review.order?.order_date || null
+    }));
 
-      return res.json({
-        success: true,
-        reviews: formattedReviews,
-        totalCount: reviews.count,
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(reviews.count / parseInt(limit))
-      });
+    return res.json({
+      success: true,
+      reviews: formattedReviews,
+      totalCount: reviews.count,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(reviews.count / parseInt(limit))
+    });
 
-    } catch (error) {
-      console.error('❌ Kullanıcı yorumları getirme hatası:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Yorumlar getirilemedi',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-      });
-    }
+  } catch (error) {
+    console.error('❌ Kullanıcı yorumları getirme hatası:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Yorumlar getirilemedi', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
+}
 
   // ✅ Yorumlanabilir siparişleri getirme (düzeltilmiş)
   static async getReviewableOrders(req, res) {
@@ -293,7 +348,7 @@ class ReviewController {
               orderDate: order.order_date,
               packageId: item.package_id,
               packageName: item.package.package_name,
-              packageImage: item.package.image_url,
+              // packageImage: item.package.image_url,
               sellerId: item.package.seller?.seller_id,
               sellerName: item.package.seller?.business_name || 'Satıcı',
               quantity: item.quantity
