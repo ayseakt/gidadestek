@@ -1,4 +1,4 @@
-// models/FoodPackage.js
+// models/FoodPackage.js - Düzeltilmiş
 module.exports = (sequelize, DataTypes) => {
   const FoodPackage = sequelize.define('FoodPackage', {
     package_id: {
@@ -151,6 +151,7 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   FoodPackage.associate = function(models) {
+    // PackageLocation ile ilişkiler
     FoodPackage.hasOne(models.PackageLocation, {
       foreignKey: 'package_id',
       as: 'location'
@@ -159,25 +160,34 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'package_id',
       as: 'packageLocation'
     });
+    
+    // Seller ile ilişki
     FoodPackage.belongsTo(models.Seller, {
       foreignKey: 'seller_id',
       as: 'seller'
     });
 
+    // Category ile ilişki
     if (models.Category) {
       FoodPackage.belongsTo(models.Category, {
         foreignKey: 'category_id',
         as: 'category'
       });
     }
+    
+    // PackageImage ile ilişki
     FoodPackage.hasMany(models.PackageImage, {
       foreignKey: 'package_id',
-      as: 'images', // ✨ Bunu kullanarak `include: [{ model: PackageImage, as: 'images' }]` yapabileceksin
+      as: 'images',
       onDelete: 'CASCADE'
     });
+    
+    // Review ile ilişki - FoodPackage has many reviews
+    FoodPackage.hasMany(models.Review, {
+      foreignKey: 'package_id',
+      as: 'reviews'
+    });
   };
-
-
 
   return FoodPackage;
 };

@@ -650,7 +650,6 @@ router.post('/create', authMiddleware, async (req, res) => {
 });
 
   // ✅ Müşteri siparişleri endpoint'i (ESKİ KOD)
-// ✅ DÜZELTİLMİŞ: Müşteri siparişleri endpoint'i
 router.get('/my-orders', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.user_id || req.user.id;
@@ -707,7 +706,7 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
       } : 'PACKAGE NULL'
     });
 
-    // ✅ ASIL SORGU - PackageLocation olmadan önce deneyelim
+    // ✅ ASIL SORGU - seller_id dahil edildi
     const orders = await Order.findAndCountAll({
       where: whereClause,
       include: [
@@ -728,7 +727,6 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
                 'discounted_price',
                 'location_id'
               ]
-              // PackageLocation'ı geçici olarak kaldırdık
             }
           ]
         },
@@ -736,7 +734,7 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
           model: Seller, 
           as: 'seller',
           required: false,
-          attributes: ['seller_id', 'business_name']
+          attributes: ['seller_id', 'business_name'] 
         }
       ],
       limit: parseInt(limit),
@@ -751,6 +749,8 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
       const firstOrder = orders.rows[0];
       console.log('🔍 İlk sipariş detayı:', {
         orderId: firstOrder.order_id,
+        sellerId: firstOrder.seller?.seller_id || 'NULL', // ✅ seller_id debug
+        sellerName: firstOrder.seller?.business_name || 'NULL',
         itemsCount: firstOrder.items?.length || 0,
         firstItem: firstOrder.items?.[0] ? {
           packageId: firstOrder.items[0].package_id,
@@ -763,12 +763,13 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
       });
     }
 
-    // ✅ DÜZELTİLMİŞ: Frontend'in beklediği format - DAHA DETAYLI
+    // ✅ DÜZELTİLMİŞ: Frontend'in beklediği format - seller_id eklendi
     const formattedOrders = orders.rows.map(order => {
       // Items kontrolü
       console.log(`🔍 Order ${order.order_id} formatlanıyor:`, {
         itemsLength: order.items?.length || 0,
-        hasItems: !!(order.items && order.items.length > 0)
+        hasItems: !!(order.items && order.items.length > 0),
+        sellerId: order.seller?.seller_id || 'NULL' // ✅ seller_id debug
       });
 
       // İlk item'ı al (sipariş ismi için)
@@ -796,8 +797,9 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
       const frontendStatus = mapBackendToFrontendStatus(order.order_status);
 
       const formattedOrder = {
-        // ✅ SİPARİŞ NUMARASI
+        // ✅ SİPARİŞ NUMARASI - Her iki format da
         orderId: order.order_id,
+        order_id: order.order_id, // ✅ Frontend için eklendi
         orderNumber: `SP${order.order_id.toString().padStart(6, '0')}`,
         
         // ✅ SİPARİŞ İSMİ - NULL kontrolü ile
@@ -828,9 +830,12 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
         totalAmount: parseFloat(order.total_amount || 0),
         formattedPrice: `${parseFloat(order.total_amount || 0).toFixed(2)} ₺`,
         
-        // Diğer bilgiler
+        // ✅ SATICI BİLGİLERİ - seller_id eklendi
+        sellerId: order.seller?.seller_id || null, // ✅ BURADA EKLENDİ
         seller: order.seller?.business_name || 'Satıcı Bulunamadı',
         sellerPhone: order.seller?.phone_number || null,
+        
+        // Diğer bilgiler
         orderDate: order.order_date || order.createdAt,
         pickupDate: order.pickup_date,
         pickupTime: order.pickup_time,
@@ -864,9 +869,12 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
       };
 
       console.log(`✅ Order ${order.order_id} formatlandı:`, {
+        orderId: formattedOrder.orderId,
+        order_id: formattedOrder.order_id, // ✅ Debug için eklendi
         orderName: formattedOrder.orderName,
         totalAmount: formattedOrder.totalAmount,
         itemsCount: formattedOrder.itemsCount,
+        sellerId: formattedOrder.sellerId, // ✅ seller_id debug
         firstItemName: formattedOrder.items[0]?.packageName || 'NONE'
       });
 
@@ -876,10 +884,13 @@ router.get('/my-orders', authMiddleware, async (req, res) => {
     console.log('✅ Formatlanmış siparişler hazır:', {
       ordersCount: formattedOrders.length,
       firstOrder: formattedOrders[0] ? {
+        orderId: formattedOrders[0].orderId,
+        order_id: formattedOrders[0].order_id, // ✅ Debug için eklendi
         orderNumber: formattedOrders[0].orderNumber,
         orderName: formattedOrders[0].orderName,
         address: formattedOrders[0].address,
-        status: formattedOrders[0].status
+        status: formattedOrders[0].status,
+        sellerId: formattedOrders[0].sellerId // ✅ seller_id debug
       } : null
     });
 

@@ -109,7 +109,7 @@ function MyOrders() {
     return stars;
   };
 
-  // Backend'den siparişleri getir - GELİŞTİRİLMİŞ HATA YÖNETİMİ
+// Backend'den siparişleri getir - DÜZELTİLMİŞ VERSİYON
 const fetchOrders = async (showLoader = true) => {
   try {
     if (showLoader) setLoading(true);
@@ -122,12 +122,11 @@ const fetchOrders = async (showLoader = true) => {
       return;
     }
 
-    // Önce backend'in çalışıp çalışmadığını kontrol et
     console.log('🔄 Backend bağlantısı kontrol ediliyor...');
     
     const baseUrl = process.env.NODE_ENV === 'production' 
-      ? '' // Production'da aynı domain
-      : 'http://localhost:5051'; // Backend'inizin gerçek portu
+      ? '' 
+      : 'http://localhost:5051';
     
     const apiUrl = `${baseUrl}/api/orders/my-orders`;
     console.log('📡 API URL:', apiUrl);
@@ -141,10 +140,7 @@ const fetchOrders = async (showLoader = true) => {
     });
 
     console.log('📡 Response Status:', response.status);
-    console.log('📡 Response URL:', response.url);
-    console.log('📡 Response Headers:', Object.fromEntries(response.headers.entries()));
 
-    // İlk olarak response durumunu kontrol et
     if (!response.ok) {
       if (response.status === 401) {
         console.log('❌ 401 Unauthorized - Token geçersiz');
@@ -152,221 +148,231 @@ const fetchOrders = async (showLoader = true) => {
         navigate('/login');
         return;
       }
-      
-      if (response.status === 404) {
-        console.log('❌ 404 - API endpoint bulunamadı');
-        throw new Error('API endpoint bulunamadı. Backend server\'ın çalıştığından emin olun.');
-      }
-      
-      if (response.status === 500) {
-        console.log('❌ 500 - Server hatası');
-        throw new Error('Sunucu hatası oluştu. Backend loglarını kontrol edin.');
-      }
-      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    // Content-Type kontrolü
     const contentType = response.headers.get('content-type');
-    console.log('📦 Content-Type:', contentType);
-    
     if (!contentType || !contentType.includes('application/json')) {
-      console.error('❌ Beklenmeyen content-type:', contentType);
-      
-      // HTML response'u text olarak oku ve logla
-      const textResponse = await response.text();
-      console.error('❌ HTML Response:', textResponse.substring(0, 500) + '...');
-      
-      // Eğer React app HTML'i dönüyorsa
-      if (textResponse.includes('<!DOCTYPE html>')) {
-        throw new Error(`
-          ❌ Backend API erişilemez durumda!
-          
-          Olası sebepler:
-          1. Backend server çalışmıyor
-          2. package.json'da proxy ayarı yanlış
-          3. API endpoint'i hatalı: ${apiUrl}
-          
-          Çözüm:
-          1. Backend server'ı başlatın
-          2. package.json'a "proxy": "http://localhost:BACKEND_PORT" ekleyin
-          3. Backend'de /api/orders/my-orders endpoint'ini kontrol edin
-        `);
-      }
-      
-      throw new Error('Sunucudan beklenmeyen yanıt formatı (HTML). API endpoint\'i kontrol edin.');
+      throw new Error('Sunucudan beklenmeyen yanıt formatı');
     }
 
-    // JSON parse et
-    let data;
-    try {
-      const responseText = await response.text();
-      console.log('📦 Raw Response:', responseText.substring(0, 200) + '...');
+    const data = await response.json();
+    
+    if (data.success) {
+      console.log('✅ Backend response:', data);
+      console.log('🔍 İlk sipariş raw data:', JSON.stringify(data.orders[0], null, 2));
       
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ JSON Parse hatası:', parseError);
-      throw new Error('Sunucu yanıtı JSON formatında değil');
+      // Backend'den gelen veriyi frontend formatına çevir - SELLER_ID DÜZELTİLDİ
+const formattedOrders = (data.orders || []).map(order => {
+  
+  // Backend'den gelen farklı ID formatlarını kontrol et
+  let orderId = null;
+  
+  // Tüm olası order ID kaynaklarını kontrol et
+  if (order.order_id) {
+    orderId = order.order_id;
+  } else if (order.orderId) {
+    orderId = order.orderId;
+  } else if (order.id) {
+    orderId = order.id;
+  }
+
+  // Backend'den gelen farklı seller_id formatlarını kontrol et
+  let sellerId = null;
+  
+  // Tüm olası seller_id kaynaklarını kontrol et
+  if (order.seller_id) {
+    sellerId = order.seller_id;
+  } else if (order.sellerId) {
+    sellerId = order.sellerId;
+  } else if (order.seller && order.seller.seller_id) {
+    sellerId = order.seller.seller_id;
+  }
+
+  // Debugging için order yapısını logla
+  console.log('🔍 Order mapping debug:', {
+    backendOrder: {
+      order_id: order.order_id,
+      orderId: order.orderId,
+      id: order.id,
+      seller_id: order.seller_id,
+      sellerId: order.sellerId
+    },
+    mappedValues: {
+      finalOrderId: orderId,
+      finalSellerId: sellerId
     }
-    
-if (data.success) {
-  console.log('✅ Siparişler başarıyla getirildi:', data.orders);
-  console.log('🔍 İlk sipariş raw data:', JSON.stringify(data.orders[0], null, 2));
-  // Backend'den gelen veriyi frontend formatına çevir - seller_id EKLENDİ
-  const formattedOrders = (data.orders || []).map(order => {
-    
-    // Seller ID'yi farklı yollardan al - daha kapsamlı kontrol
-  const seller = order.seller; // Backend'de 'as: seller' olarak tanımlandığı için
-  
-  // Seller ID kontrolü - sadece doğru yoldan al
-  const sellerId = seller?.seller_id || null;
-  
-  // Debugging için (geliştirme aşamasında)
-  if (!sellerId) {
-    console.error('❌ Seller ID bulunamadı:', {
-      orderStructure: {
-        id: order.id,
-        seller: order.seller,
-        seller_id_in_seller: order.seller?.seller_id
-      }
+  });
+
+  // Order ID bulunamadıysa uyarı ver
+  if (!orderId) {
+    console.error('❌ ORDER ID BULUNAMADI - Order yapısı:', {
+      orderKeys: Object.keys(order),
+      order: order
     });
   }
-    
-    return {
-      id: order.id,
-      seller_id: sellerId, // ✅ Düzeltilmiş seller_id mapping
-      storeName: order.sellerName || 
-                 order.seller || 
-                 (order.seller && order.seller.business_name) || 
-                 (order.Seller && order.Seller.business_name) ||
-                 'İş Yeri Adı Belirtilmemiş',
-      productName: order.productName || 
-                   order.orderName || 
-                   (order.items && order.items.length > 0 ? 
-                    order.items.map(item => item.name).join(', ') : 'Ürün Adı Yok'),
-      price: parseFloat(order.price || order.totalAmount || order.total_amount || 0),
-      originalPrice: parseFloat(order.originalPrice || order.price || order.totalAmount || order.total_amount || 0),
-      orderDate: order.createdAt || order.orderDate || new Date().toISOString(),
-      pickupDate: order.pickupDate || order.createdAt || new Date().toISOString(),
-      status: order.status === 'yeni' ? 'devam_ediyor' : order.status,
-      address: order.address || 
-               (order.seller && order.seller.address) || 
-               (order.Seller && order.Seller.address) ||
-               'Adres bilgisi yok',
-      confirmationCode: order.confirmationCode,
-      trackingNumber: order.trackingNumber || `SPY${(order.id || order.order_id || '').toString().padStart(8, '0')}`,
-      storeImage: order.storeImage || '/default-store.png',
-      items: order.items || [{ 
-        name: order.productName || order.orderName || 'Ürün', 
-        quantity: 1, 
-        price: order.price || order.totalAmount || 0 
-      }],
-      hasReview: order.hasReview || false,
-      package_id: order.package_id || (order.package && order.package.id) // Yorum için gerekli
-    };
-  });
+
+  // Seller ID bulunamadıysa uyarı ver
+  if (!sellerId) {
+    console.error('❌ SELLER ID BULUNAMADI - Order yapısı:', {
+      orderKeys: Object.keys(order),
+      sellerStructure: order.seller
+    });
+  }
   
-  console.log('🔄 Formatlanmış siparişler:', formattedOrders);
-  setOrders(formattedOrders);
-  setFilteredOrders(formattedOrders);
-  setError(null);
-} else {
-  throw new Error(data.message || 'Siparişler getirilemedi');
-}
+  return {
+    id: orderId, // ✅ Düzeltilmiş order ID mapping
+    seller_id: sellerId, // ✅ Düzeltilmiş seller_id mapping
+    storeName: order.seller || 
+               order.sellerName || 
+               order.seller_name ||
+               (order.seller && order.seller.business_name) || 
+               'İş Yeri Adı Belirtilmemiş',
+    productName: order.orderName || 
+                 order.productName || 
+                 (order.items && order.items.length > 0 ? 
+                  order.items.map(item => item.packageName || item.name).join(', ') : 'Ürün Adı Yok'),
+    price: parseFloat(order.totalAmount || order.total_amount || order.price || 0),
+    originalPrice: parseFloat(order.originalPrice || order.totalAmount || order.total_amount || order.price || 0),
+    orderDate: order.orderDate || order.createdAt || new Date().toISOString(),
+    pickupDate: order.pickupDate || order.orderDate || order.createdAt || new Date().toISOString(),
+    status: order.status === 'yeni' ? 'devam_ediyor' : order.status,
+    address: order.address || 
+             order.pickupAddress ||
+             (order.seller && order.seller.address) || 
+             'Adres bilgisi yok',
+    confirmationCode: order.confirmationCode,
+    trackingNumber: order.orderNumber || `SPY${(orderId || '').toString().padStart(8, '0')}`,
+    storeImage: order.storeImage || '/default-store.png',
+    items: order.items || [{ 
+      name: order.orderName || order.productName || 'Ürün', 
+      quantity: 1, 
+      price: order.totalAmount || order.total_amount || order.price || 0 
+    }],
+    hasReview: order.hasReview || false,
+    package_id: order.package_id || (order.items && order.items[0] && order.items[0].packageId)
+  };
+});
+      
+console.log('🔄 Formatlanmış siparişler kontrolü:', formattedOrders.map(o => ({
+  id: o.id,
+  seller_id: o.seller_id,
+  storeName: o.storeName,
+  hasValidIds: !!(o.id && o.seller_id)
+})));
+const validOrders = formattedOrders.filter(order => {
+  if (!order.id || !order.seller_id) {
+    console.warn('⚠️ Eksik ID\'li sipariş filtrelendi:', {
+      id: order.id,
+      seller_id: order.seller_id,
+      storeName: order.storeName
+    });
+    return false;
+  }
+  return true;
+});
+
+console.log('✅ Geçerli siparişler:', validOrders.length, '/', formattedOrders.length);
+
+      
+      setOrders(formattedOrders);
+      setFilteredOrders(formattedOrders);
+      setError(null);
+    } else {
+      throw new Error(data.message || 'Siparişler getirilemedi');
+    }
   } catch (err) {
     console.error('❌ Sipariş getirme hatası:', err);
-    
-    // Hata tipine göre kullanıcı dostu mesajlar
-    let userMessage = 'Siparişler yüklenirken hata oluştu';
-    
-    if (err.message.includes('fetch')) {
-      userMessage = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
-    } else if (err.message.includes('JSON')) {
-      userMessage = 'Sunucudan geçersiz yanıt alındı. Lütfen tekrar deneyin.';
-    } else if (err.message.includes('API endpoint')) {
-      userMessage = 'Backend API servisi bulunamadı. Sistem yöneticisiyle iletişime geçin.';
-    } else if (err.message.includes('Backend API erişilemez')) {
-      userMessage = 'Backend servisi çalışmıyor. Lütfen sistem yöneticisiyle iletişime geçin.';
-    } else {
-      userMessage = err.message;
-    }
-    
-    setError(userMessage);
-    
-    // Fallback: localStorage'dan son siparişi kontrol et (eğer varsa)
-    const lastOrder = localStorage.getItem('lastOrder');
-    if (lastOrder && orders.length === 0) {
-      try {
-        const parsedOrder = JSON.parse(lastOrder);
-        console.log('📱 Cached order kullanılıyor:', parsedOrder);
-        setOrders([parsedOrder]);
-        setFilteredOrders([parsedOrder]);
-      } catch (parseError) {
-        console.error('Cached order parse error:', parseError);
-      }
-    }
+    setError('Siparişler yüklenirken hata oluştu: ' + err.message);
   } finally {
     setLoading(false);
     setRefreshing(false);
   }
 };
   // Yorum gönderme
-// Yorum gönderme - DÜZELTİLMİŞ VERSİYON
+// Yorum gönderme - GÜVENLİ VERSİYON
 const submitReview = async () => {
-  if (!reviewOrder){
-      console.error('❌ Review order bulunamadı');
+  if (!reviewOrder) {
+    console.error('❌ Review order bulunamadı');
+    alert('Sipariş bilgisi bulunamadı. Lütfen sayfayı yenileyin.');
     return;
   }
+
   try {
     setSubmittingReview(true);
     const token = localStorage.getItem('token');
+    
+    if (!token) {
+      alert('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      navigate('/login');
+      return;
+    }
+
     const baseUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5051';
+    
+    // Seller ID'yi farklı yollardan al
     const sellerId = reviewOrder.seller_id || reviewOrder.sellerId;
-    console.log('🔍 Review için seller bilgileri:', {
+    
+    console.log('🔍 Review için detaylı seller bilgileri:', {
       'reviewOrder.seller_id': reviewOrder.seller_id,
       'reviewOrder.sellerId': reviewOrder.sellerId,
       'sellerId': sellerId,
+      'reviewOrder.id': reviewOrder.id,
+      'reviewOrder keys': Object.keys(reviewOrder),
       'reviewOrder': reviewOrder
     });
     
+    // Seller ID kontrolü - detaylı hata mesajı
     if (!sellerId) {
-      console.error('❌ Seller ID bulunamadı:', reviewOrder);
-      throw new Error(`Satıcı bilgisi bulunamadı. 
-        Order ID: ${reviewOrder.id}
-        Store Name: ${reviewOrder.storeName}
-        Lütfen sayfayı yeniden yükleyin veya destek ekibiyle iletişime geçin.`);
+      const errorMessage = `Satıcı bilgisi bulunamadı.
+        
+        Sipariş Detayları:
+        - Order ID: ${reviewOrder.id || 'Bilinmiyor'}
+        - Store Name: ${reviewOrder.storeName || 'Bilinmiyor'}
+        - Seller ID: ${reviewOrder.seller_id || 'undefined'}
+        - Seller ID Alt: ${reviewOrder.sellerId || 'undefined'}
+        
+        Bu sorun genellikle backend'den gelen veri yapısındaki eksiklikten kaynaklanır.
+        Lütfen sayfayı yenileyin veya destek ekibiyle iletişime geçin.`;
+      
+      console.error('❌ Seller ID bulunamadı:', {
+        orderStructure: reviewOrder,
+        availableKeys: Object.keys(reviewOrder)
+      });
+      
+      alert(errorMessage);
+      return;
     }
+
     // Backend'e gönderilecek veri - EKSİK ALANLAR EKLENDİ
     const reviewPayload = {
-      seller_id: sellerId, // ✅ Zorunlu alan
+      seller_id: parseInt(sellerId), // ✅ Integer'a çevir
       rating: parseInt(reviewData.rating),
       order_id: reviewOrder.id,
       package_id: reviewOrder.package_id,
-      overall_rating: reviewData.rating, // ✅ Backend'in beklediği alan adı farklı olabilir
-      comment: reviewData.comment,
-      food_quality_rating: reviewData.food_quality_rating,
-      service_rating: reviewData.service_rating,
-      value_rating: reviewData.value_rating,
-      is_anonymous: reviewData.is_anonymous
+      overall_rating: parseInt(reviewData.rating),
+      comment: reviewData.comment || '', // ✅ Boş string varsayılan
+      food_quality_rating: parseInt(reviewData.food_quality_rating),
+      service_rating: parseInt(reviewData.service_rating),
+      value_rating: parseInt(reviewData.value_rating),
+      is_anonymous: Boolean(reviewData.is_anonymous)
     };
 
-        // Payload'ı konsola yazdır - DEBUG
-    console.log('📤 Yorum gönderiliyor:', {
-      ...reviewPayload,
-      'reviewOrder.seller_id': reviewOrder.seller_id,
-      'reviewOrder.sellerId': reviewOrder.sellerId,
-      'reviewOrder.id': reviewOrder.id,
-      'reviewData.rating': reviewData.rating
-    });
+    // Payload'ı konsola yazdır - DEBUG
+    console.log('📤 Review payload gönderiliyor:', reviewPayload);
     
     // Kritik alanları tekrar kontrol et
-    if (!reviewPayload.seller_id || !reviewPayload.rating) {
+    if (!reviewPayload.seller_id || !reviewPayload.rating || !reviewPayload.order_id) {
       console.error('❌ Kritik alanlar eksik:', {
         seller_id: reviewPayload.seller_id,
-        rating: reviewPayload.rating
+        rating: reviewPayload.rating,
+        order_id: reviewPayload.order_id
       });
-      throw new Error('Satıcı ID veya puan bilgisi eksik');
+      alert('Gerekli bilgiler eksik. Lütfen sayfayı yenileyin.');
+      return;
     }
+    
+    console.log('📡 Review API çağrısı yapılıyor...');
     
     const response = await fetch(`${baseUrl}/api/reviews/create`, {
       method: 'POST',
@@ -377,7 +383,36 @@ const submitReview = async () => {
       body: JSON.stringify(reviewPayload)
     });
 
+    console.log('📡 Review Response Status:', response.status);
+    console.log('📡 Review Response Headers:', Object.fromEntries(response.headers.entries()));
+
+    // Response kontrolü
+    if (!response.ok) {
+      if (response.status === 401) {
+        alert('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        navigate('/login');
+        return;
+      } else if (response.status === 400) {
+        throw new Error('Gönderdiğiniz bilgiler eksik veya hatalı.');
+      } else if (response.status === 404) {
+        throw new Error('Yorum servisi bulunamadı. Backend çalışıyor mu kontrol edin.');
+      } else if (response.status === 500) {
+        throw new Error('Sunucu hatası oluştu. Lütfen tekrar deneyin.');
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    }
+
+    // Content-Type kontrolü
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('❌ Beklenmeyen content-type:', contentType);
+      throw new Error('Sunucudan beklenmeyen yanıt formatı alındı.');
+    }
+
+    // Response'u parse et
     const data = await response.json();
+    console.log('📡 Review Response Data:', data);
     
     if (data.success) {
       console.log('✅ Yorum başarıyla gönderildi:', data);
@@ -403,14 +438,28 @@ const submitReview = async () => {
         is_anonymous: false
       });
       
-      alert('Yorumunuz başarıyla gönderildi!');
+      alert('Yorumunuz başarıyla gönderildi! Teşekkür ederiz.');
     } else {
       console.error('❌ Backend hatası:', data);
-      throw new Error(data.message || 'Yorum gönderilirken hata oluştu');
+      throw new Error(data.message || data.error || 'Yorum gönderilirken bilinmeyen hata oluştu');
     }
   } catch (error) {
     console.error('❌ Yorum gönderme hatası:', error);
-    alert('Yorum gönderilirken hata oluştu: ' + error.message);
+    
+    // Kullanıcı dostu hata mesajları
+    let userMessage = 'Yorum gönderilirken hata oluştu.';
+    
+    if (error.message.includes('fetch')) {
+      userMessage = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+    } else if (error.message.includes('JSON')) {
+      userMessage = 'Sunucudan geçersiz yanıt alındı. Lütfen tekrar deneyin.';
+    } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+      userMessage = 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.';
+    } else {
+      userMessage = error.message;
+    }
+    
+    alert(userMessage);
   } finally {
     setSubmittingReview(false);
   }

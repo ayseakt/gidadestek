@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
-// framer-motion'u temporari olarak kaldıralım
-// import { motion } from 'framer-motion';
 import './WelcomeScreen.css';
-// Logo için alternatif çözüm
-// import logo from '../assets/sofrapay-logo.png';
 
 const WelcomeScreen = ({ onComplete }) => {
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
@@ -26,50 +22,48 @@ const WelcomeScreen = ({ onComplete }) => {
   };
 
   // Kayıt ol fonksiyonu
-  // Kayıt ol fonksiyonu
-    const handleSignup = async (e) => {
-      e.preventDefault();
-      setLoading(true);
-      setError('');
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-      try {
-        const response = await fetch('http://localhost:5051/api/auth/signup', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
-        
-        // Önce response.ok'u kontrol et
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        if (!result.success) {
-          throw new Error(result.message || 'Kayıt işlemi başarısız oldu');
-        }
-        
-        console.log('Kayıt başarılı:', result);
-
-        // Kayıt başarılı mesajını göster ve giriş sayfasına yönlendir
-        setRegistrationSuccess(true);
-        setTimeout(() => {
-          setCurrentPage(2); // Giriş sayfasına yönlendir
-          setRegistrationSuccess(false);
-        }, 2000);
-      } catch (error) {
-        console.error('Kayıt hatası:', error);
-        setError(error.message || 'Kayıt sırasında bir hata oluştu');
-      } finally {
-        setLoading(false);
+    try {
+      const response = await fetch('http://localhost:5051/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
-    };
 
-  // Giriş yap fonksiyonu
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Kayıt işlemi başarısız oldu');
+      }
+      
+      console.log('Kayıt başarılı:', result);
+
+      // Kayıt başarılı mesajını göster ve giriş sayfasına yönlendir
+      setRegistrationSuccess(true);
+      setTimeout(() => {
+        setCurrentPage(2); // Giriş sayfasına yönlendir
+        setRegistrationSuccess(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Kayıt hatası:', error);
+      setError(error.message || 'Kayıt sırasında bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Giriş yap fonksiyonu - GÜNCELLENDİ
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -95,12 +89,39 @@ const WelcomeScreen = ({ onComplete }) => {
       
       console.log('Giriş başarılı:', result);
 
-      // Başarılıysa token'ı localStorage'a kaydet
-      localStorage.setItem('token', result.token);
-      localStorage.setItem('user', JSON.stringify(result.user));
-
-      // Uygulamaya devam et
-      onComplete(result.user);
+      // Token ve kullanıcı bilgilerini localStorage'a kaydet
+      if (result.token) {
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('authToken', result.token); // Alternatif anahtar
+      }
+      
+      if (result.user) {
+        // Kullanıcı bilgilerini normalize et
+        const normalizedUser = {
+          ...result.user,
+          id: result.user.id || result.user.user_id || result.user.userId,
+          user_id: result.user.user_id || result.user.id || result.user.userId,
+          userId: result.user.userId || result.user.id || result.user.user_id
+        };
+        
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
+        
+        // Form verilerini temizle
+        setFormData({
+          email: '',
+          password: '',
+          name: '',
+          phone: '',
+        });
+        
+        // Ana uygulamaya geçiş yap - biraz gecikme ekle
+        setTimeout(() => {
+          onComplete(normalizedUser);
+        }, 100);
+      } else {
+        throw new Error('Kullanıcı bilgileri alınamadı');
+      }
+      
     } catch (error) {
       console.error('Giriş hatası:', error);
       setError(error.message || 'Giriş sırasında bir hata oluştu');
@@ -109,6 +130,7 @@ const WelcomeScreen = ({ onComplete }) => {
     }
   };
 
+  // Misafir olarak devam et fonksiyonu - GÜNCELLENDİ
   const handleGuestContinue = async () => {
     setLoading(true);
     
@@ -122,39 +144,84 @@ const WelcomeScreen = ({ onComplete }) => {
 
       const result = await response.json();
       
-      if (result.success) {
-        // Misafir token'ını kaydet
+      if (result.success && result.token) {
         localStorage.setItem('token', result.token);
+        localStorage.setItem('authToken', result.token);
         localStorage.setItem('isGuest', 'true');
+        
+        // Misafir kullanıcı bilgisi oluştur
+        const guestUser = {
+          id: 'guest',
+          user_id: 'guest',
+          userId: 'guest',
+          name: 'Misafir Kullanıcı',
+          email: '',
+          isGuest: true
+        };
+        
+        localStorage.setItem('user', JSON.stringify(guestUser));
+        
+        setTimeout(() => {
+          onComplete(guestUser);
+        }, 100);
+      } else {
+        // API başarısız olsa bile misafir olarak devam et
+        const guestUser = {
+          id: 'guest',
+          user_id: 'guest',
+          userId: 'guest',
+          name: 'Misafir Kullanıcı',
+          email: '',
+          isGuest: true
+        };
+        
+        localStorage.setItem('isGuest', 'true');
+        localStorage.setItem('user', JSON.stringify(guestUser));
+        
+        setTimeout(() => {
+          onComplete(guestUser);
+        }, 100);
       }
-      
-      onComplete(null); // Misafir olarak devam et
     } catch (error) {
       console.error('Misafir giriş hatası:', error);
-      onComplete(null); // Hata olsa bile devam et
+      
+      // Hata olsa bile misafir olarak devam et
+      const guestUser = {
+        id: 'guest',
+        user_id: 'guest',
+        userId: 'guest',
+        name: 'Misafir Kullanıcı',
+        email: '',
+        isGuest: true
+      };
+      
+      localStorage.setItem('isGuest', 'true');
+      localStorage.setItem('user', JSON.stringify(guestUser));
+      
+      setTimeout(() => {
+        onComplete(guestUser);
+      }, 100);
     } finally {
       setLoading(false);
     }
   };
 
+  // Şifremi unuttum sayfasına git
+  const handleForgotPassword = () => {
+    setCurrentPage(3);
+  };
+
   const pages = [
     // İlk karşılama sayfası
-    <div 
-      key="welcome" 
-      className="welcome-page"
-    >
+    <div key="welcome" className="welcome-page">
       <div className="welcome-content">
-        {/* Logo için temporari çözüm */}
-                  <img 
-            src="/logo1.png" 
-            alt="SofraPay Logo" 
-            style={{ width: '100px', height: '100px', objectFit: 'contain' }}
-            
-          />
+        <img 
+          src="/logo1.png" 
+          alt="SofraPay Logo" 
+          style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+        />
         <h1>Lezzetli yemekler <span className="highlight">dakikalar içinde</span> kapınızda!</h1>
         <p>En sevdiğiniz restoran ve marketlerin lezzetli ürünleri SofraPay ile çok yakınınızda.</p>
-        
-
         
         <div className="welcome-buttons">
           <button 
@@ -171,21 +238,18 @@ const WelcomeScreen = ({ onComplete }) => {
           </button>
         </div>
         
-        {/* <button 
+        <button 
           className="tertiary-button"
           onClick={handleGuestContinue}
           disabled={loading}
         >
           {loading ? 'Lütfen bekleyin...' : 'Misafir Olarak Devam Et'}
-        </button> */}
+        </button>
       </div>
     </div>,
     
     // Üye olma sayfası
-    <div 
-      key="signup" 
-      className="auth-page"
-    >
+    <div key="signup" className="auth-page">
       <div className="page-header">
         <button className="back-button" onClick={() => setCurrentPage(0)}>
           <i className="fas fa-arrow-left"></i>
@@ -195,9 +259,9 @@ const WelcomeScreen = ({ onComplete }) => {
       
       {error && <div className="error-message">{error}</div>}
       {registrationSuccess && (
-      <div className="success-message">
-        Kaydınız başarıyla yapılmıştır. Giriş sayfasına yönlendiriliyorsunuz...
-      </div>
+        <div className="success-message">
+          Kaydınız başarıyla yapılmıştır. Giriş sayfasına yönlendiriliyorsunuz...
+        </div>
       )}
       
       <form onSubmit={handleSignup} className="auth-form">
@@ -281,10 +345,7 @@ const WelcomeScreen = ({ onComplete }) => {
     </div>,
     
     // Giriş yapma sayfası
-    <div 
-      key="login" 
-      className="auth-page"
-    >
+    <div key="login" className="auth-page">
       <div className="page-header">
         <button className="back-button" onClick={() => setCurrentPage(0)}>
           <i className="fas fa-arrow-left"></i>
@@ -319,9 +380,13 @@ const WelcomeScreen = ({ onComplete }) => {
             placeholder="Şifreniz"
             required
           />
-          <a href="#" className="forgot-password" onClick={() => setCurrentPage(3)}>
+          <button 
+            type="button" 
+            className="forgot-password" 
+            onClick={handleForgotPassword}
+          >
             Şifremi Unuttum
-          </a>
+          </button>
         </div>
         
         <button 

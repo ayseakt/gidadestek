@@ -10,14 +10,13 @@ const {
 const { Op } = require('sequelize');
 
 class ReviewController {
-  // ✅ Yorum oluşturma (sadece teslim edilmiş siparişler için)
+  // ✅ Yorum oluşturma (düzeltilmiş - doğru seller_id kullanımı)
   static async createReview(req, res) {
     try {
       const userId = req.user.user_id || req.user.id;
       const { 
         order_id,
-        seller_id,
-        package_id,
+        package_id, // Bu zorunlu olmalı çünkü hangi ürüne yorum yapıldığı bilinmeli
         rating,
         food_quality_rating,
         service_rating,
@@ -26,13 +25,20 @@ class ReviewController {
         is_anonymous = false
       } = req.body;
 
-      console.log('📝 Yeni yorum oluşturuluyor:', { userId, order_id, seller_id, rating });
+      console.log('📝 Yeni yorum oluşturuluyor:', { userId, order_id, package_id, rating });
+      const userAsSeller = await Seller.findOne({
+        where: { user_id: userId }
+      });
+
+      if (userAsSeller) {
+        console.log('👤 Kullanıcı aynı zamanda satıcı:', userAsSeller.seller_id);
+      }
 
       // Validasyonlar
-      if (!seller_id || !rating) {
+      if (!package_id || !rating) {
         return res.status(400).json({
           success: false,
-          message: 'Satıcı ID ve genel puan zorunludur'
+          message: 'Ürün ID ve genel puan zorunludur'
         });
       }
 
@@ -44,6 +50,31 @@ class ReviewController {
         });
       }
 
+      // Paketi ve sahibini bul
+      const foodPackage = await FoodPackage.findByPk(package_id, {
+        include: [
+          {
+            model: Seller,
+            as: 'seller',
+            attributes: ['seller_id', 'business_name']
+          }
+        ]
+      });
+
+      if (!foodPackage) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ürün bulunamadı'
+        });
+      }
+      const seller_id = foodPackage.seller.seller_id; // seller tablosundan direkt al
+      console.log('🎯 Yorum yapılacak seller:', { 
+        package_seller_id: seller_id, 
+        user_seller_id: userAsSeller?.seller_id || 'yok' 
+      });
+
+     
+
       // Eğer order_id verilmişse, siparişin teslim edilmiş olup olmadığını kontrol et
       if (order_id) {
         const order = await Order.findOne({
@@ -51,20 +82,29 @@ class ReviewController {
             order_id: order_id,
             user_id: userId,
             order_status: { [Op.in]: ['completed', 'teslim_edildi'] }
-          }
+          },
+          include: [
+            {
+              model: OrderItem,
+              as: 'items',
+              where: { package_id: package_id },
+              required: true
+            }
+          ]
         });
 
         if (!order) {
           return res.status(400).json({
             success: false,
-            message: 'Bu sipariş için yorum yapılamaz (tamamlanmamış veya size ait değil)'
+            message: 'Bu sipariş için yorum yapılamaz veya bu ürün siparişte bulunmuyor'
           });
         }
 
-        // Bu sipariş için daha önce yorum yapılmış mı kontrol et
+        // Bu ürün için daha önce yorum yapılmış mı kontrol et
         const existingReview = await Review.findOne({
           where: {
             user_id: userId,
+            package_id: package_id,
             order_id: order_id
           }
         });
@@ -72,27 +112,7 @@ class ReviewController {
         if (existingReview) {
           return res.status(400).json({
             success: false,
-            message: 'Bu sipariş için zaten yorum yapmışsınız'
-          });
-        }
-      }
-
-      // Satıcının var olup olmadığını kontrol et
-      const seller = await Seller.findByPk(seller_id);
-      if (!seller) {
-        return res.status(404).json({
-          success: false,
-          message: 'Satıcı bulunamadı'
-        });
-      }
-
-      // Package kontrolü (eğer verilmişse)
-      if (package_id) {
-        const packageInfo = await FoodPackage.findByPk(package_id);
-        if (!packageInfo || packageInfo.seller_id !== seller_id) {
-          return res.status(400).json({
-            success: false,
-            message: 'Geçersiz ürün ID'
+            message: 'Bu ürün için zaten yorum yapmışsınız'
           });
         }
       }
@@ -100,9 +120,9 @@ class ReviewController {
       // Yorumu oluştur
       const review = await Review.create({
         user_id: userId,
-        seller_id: seller_id,
+        seller_id: seller_id, // Paketin sahibi olan satıcı
         order_id: order_id || null,
-        package_id: package_id || null,
+        package_id: package_id,
         rating: parseInt(rating),
         food_quality_rating: parseInt(food_quality_rating || rating),
         service_rating: parseInt(service_rating || rating),
@@ -115,38 +135,15 @@ class ReviewController {
 
       console.log('✅ Yorum başarıyla oluşturuldu:', review.review_id);
 
-      // Yorumu ilişkiler ile birlikte getir
-      const createdReview = await Review.findByPk(review.review_id, {
-        include: [
-          {
-            model: User,
-            as: 'user',
-            attributes: ['user_id'],
-            include: [
-              {
-                model: UserProfile,
-                as: 'profile',
-                attributes: ['first_name', 'last_name']
-              }
-            ]
-          },
-          {
-            model: Seller,
-            as: 'seller',
-            attributes: ['seller_id', 'business_name']
-          },
-          {
-            model: FoodPackage,
-            as: 'package',
-            attributes: ['package_id', 'package_name']
-          }
-        ]
-      });
-
       return res.status(201).json({
         success: true,
         message: 'Yorumunuz başarıyla eklendi',
-        review: createdReview
+        review: {
+          review_id: review.review_id,
+          seller_name: foodPackage.seller?.business_name,
+          product_name: foodPackage.package_name,
+          rating: review.rating
+        }
       });
 
     } catch (error) {
@@ -159,7 +156,169 @@ class ReviewController {
     }
   }
 
-  // ✅ Satıcının aldığı yorumları getirme
+  // ✅ Kullanıcının kendi yorumları (düzeltilmiş - eksik veriler eklendi)
+  static async getUserReviews(req, res) {
+    try {
+      const userId = req.user.user_id || req.user.id;
+      const { page = 1, limit = 10 } = req.query;
+
+      console.log('📋 Kullanıcı yorumları getiriliyor:', userId);
+
+      const reviews = await Review.findAndCountAll({
+        where: {
+          user_id: userId
+        },
+        include: [
+          {
+            model: Seller,
+            as: 'seller',
+            attributes: ['seller_id', 'business_name']
+          },
+          {
+            model: FoodPackage,
+            as: 'package',
+            attributes: ['package_id', 'package_name',  'discounted_price'],
+            required: false,
+            include: [
+              {
+                model: Seller,
+                as: 'seller',
+                attributes: ['business_name']
+              }
+            ]
+          },
+          {
+            model: Order,
+            as: 'order',
+            attributes: ['order_id', 'order_date'],
+            required: false
+          }
+        ],
+        order: [['created_at', 'DESC']],
+        limit: parseInt(limit),
+        offset: (parseInt(page) - 1) * parseInt(limit)
+      });
+
+      const formattedReviews = reviews.rows.map(review => ({
+        review_id: review.review_id,
+        seller_name: review.seller?.business_name || 'Satıcı Bulunamadı',
+        product_name: review.package?.package_name || 'Ürün Bulunamadı',
+        // product_image: review.package?.image_url || '/default-food.jpg',
+        rating: review.rating,
+        food_quality_rating: review.food_quality_rating,
+        service_rating: review.service_rating,
+        value_rating: review.value_rating,
+        comment: review.comment,
+        helpful_count: review.helpful_count,
+        is_visible: review.is_visible,
+        is_anonymous: review.is_anonymous,
+        created_at: review.created_at,
+        response_text: review.response_text,
+        response_date: review.response_date,
+        order_date: review.order?.order_date || null
+      }));
+
+      return res.json({
+        success: true,
+        reviews: formattedReviews,
+        totalCount: reviews.count,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(reviews.count / parseInt(limit))
+      });
+
+    } catch (error) {
+      console.error('❌ Kullanıcı yorumları getirme hatası:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Yorumlar getirilemedi',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
+    }
+  }
+
+  // ✅ Yorumlanabilir siparişleri getirme (düzeltilmiş)
+  static async getReviewableOrders(req, res) {
+    try {
+      const userId = req.user.user_id || req.user.id;
+
+      console.log('📋 Yorumlanabilir siparişler getiriliyor:', userId);
+
+      // Tamamlanmış siparişleri getir
+      const completedOrders = await Order.findAll({
+        where: {
+          user_id: userId,
+          order_status: { [Op.in]: ['completed', 'teslim_edildi'] }
+        },
+        include: [
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [
+              {
+                model: FoodPackage,
+                as: 'package',
+                attributes: ['package_id', 'package_name'],
+                include: [
+                  {
+                    model: Seller,
+                    as: 'seller',
+                    attributes: ['seller_id', 'business_name']
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        order: [['order_date', 'DESC']]
+      });
+
+      // Her sipariş için yorumlanabilir ürünleri kontrol et
+      const reviewableItems = [];
+
+      for (const order of completedOrders) {
+        for (const item of order.items) {
+          // Bu ürün için daha önce yorum yapılmış mı kontrol et
+          const existingReview = await Review.findOne({
+            where: {
+              user_id: userId,
+              package_id: item.package_id,
+              order_id: order.order_id
+            }
+          });
+
+          if (!existingReview && item.package) {
+            reviewableItems.push({
+              orderId: order.order_id,
+              orderNumber: `SP${order.order_id.toString().padStart(6, '0')}`,
+              orderDate: order.order_date,
+              packageId: item.package_id,
+              packageName: item.package.package_name,
+              packageImage: item.package.image_url,
+              sellerId: item.package.seller?.seller_id,
+              sellerName: item.package.seller?.business_name || 'Satıcı',
+              quantity: item.quantity
+            });
+          }
+        }
+      }
+
+      return res.json({
+        success: true,
+        reviewableItems: reviewableItems,
+        message: reviewableItems.length === 0 ? 'Yorumlanabilir ürün bulunmuyor' : null
+      });
+
+    } catch (error) {
+      console.error('❌ Yorumlanabilir siparişler getirme hatası:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Siparişler getirilemedi',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
+    }
+  }
+
+  // Diğer methodlar aynı kalıyor...
   static async getSellerReviews(req, res) {
     try {
       const { sellerId } = req.params;
@@ -167,7 +326,6 @@ class ReviewController {
 
       console.log('📋 Satıcı yorumları getiriliyor:', { sellerId, page, limit, sort });
 
-      // Sıralama seçenekleri
       let orderClause;
       switch (sort) {
         case 'oldest':
@@ -216,7 +374,6 @@ class ReviewController {
         offset: (parseInt(page) - 1) * parseInt(limit)
       });
 
-      // Ortalama puanları hesapla
       const avgRatings = await Review.findOne({
         where: {
           seller_id: sellerId,
@@ -232,7 +389,6 @@ class ReviewController {
         raw: true
       });
 
-      // Puan dağılımını hesapla
       const ratingDistribution = await Review.findAll({
         where: {
           seller_id: sellerId,
@@ -246,7 +402,6 @@ class ReviewController {
         raw: true
       });
 
-      // Frontend formatına çevir
       const formattedReviews = reviews.rows.map(review => {
         const userName = review.is_anonymous 
           ? 'Anonim Kullanıcı'
@@ -306,81 +461,7 @@ class ReviewController {
     }
   }
 
-  // ✅ Kullanıcının kendi yorumları
-  static async getUserReviews(req, res) {
-    try {
-      const userId = req.user.user_id || req.user.id;
-      const { page = 1, limit = 10 } = req.query;
-
-      console.log('📋 Kullanıcı yorumları getiriliyor:', userId);
-
-      const reviews = await Review.findAndCountAll({
-        where: {
-          user_id: userId
-        },
-        include: [
-          {
-            model: Seller,
-            as: 'seller',
-            attributes: ['seller_id', 'business_name']
-          },
-          {
-            model: FoodPackage,
-            as: 'package',
-            attributes: ['package_id', 'package_name'],
-            required: false
-          },
-          {
-            model: Order,
-            as: 'order',
-            attributes: ['order_id', 'order_date'],
-            required: false
-          }
-        ],
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: (parseInt(page) - 1) * parseInt(limit)
-      });
-
-      const formattedReviews = reviews.rows.map(review => ({
-        id: review.review_id,
-        sellerName: review.seller?.business_name || 'Satıcı',
-        packageName: review.package?.package_name || null,
-        rating: review.rating,
-        foodQuality: review.food_quality_rating,
-        service: review.service_rating,
-        value: review.value_rating,
-        comment: review.comment,
-        helpfulCount: review.helpful_count,
-        isVisible: review.is_visible,
-        isAnonymous: review.is_anonymous,
-        createdAt: review.created_at,
-        orderDate: review.order?.order_date || null,
-        response: review.response_text ? {
-          text: review.response_text,
-          date: review.response_date
-        } : null
-      }));
-
-      return res.json({
-        success: true,
-        reviews: formattedReviews,
-        totalCount: reviews.count,
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(reviews.count / parseInt(limit))
-      });
-
-    } catch (error) {
-      console.error('❌ Kullanıcı yorumları getirme hatası:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Yorumlar getirilemedi',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-      });
-    }
-  }
-
-  // ✅ Satıcının yorumlara yanıt vermesi
+  // Diğer methodlar (respondToReview, markHelpful, updateVisibility, updateReview, deleteReview) aynı kalıyor...
   static async respondToReview(req, res) {
     try {
       const { reviewId } = req.params;
@@ -396,7 +477,6 @@ class ReviewController {
         });
       }
 
-      // Satıcı kontrolü
       const seller = await Seller.findOne({
         where: { user_id: userId }
       });
@@ -408,7 +488,6 @@ class ReviewController {
         });
       }
 
-      // Yorumun bu satıcıya ait olup olmadığını kontrol et
       const review = await Review.findOne({
         where: {
           review_id: reviewId,
@@ -423,7 +502,6 @@ class ReviewController {
         });
       }
 
-      // Yanıtı güncelle
       await review.update({
         response_text: response_text.trim(),
         response_date: new Date()
@@ -450,11 +528,10 @@ class ReviewController {
     }
   }
 
-  // ✅ Yorum faydalı bulma/bulmama
   static async markHelpful(req, res) {
     try {
       const { reviewId } = req.params;
-      const { helpful } = req.body; // true veya false
+      const { helpful } = req.body;
 
       const review = await Review.findByPk(reviewId);
       if (!review) {
@@ -464,7 +541,6 @@ class ReviewController {
         });
       }
 
-      // Faydalı sayısını güncelle
       const increment = helpful === true ? 1 : (helpful === false ? -1 : 0);
       const newCount = Math.max(0, review.helpful_count + increment);
 
@@ -488,14 +564,12 @@ class ReviewController {
     }
   }
 
-  // ✅ Yorum görünürlüğünü değiştirme (admin/satıcı)
   static async updateVisibility(req, res) {
     try {
       const { reviewId } = req.params;
       const { is_visible } = req.body;
       const userId = req.user.user_id || req.user.id;
 
-      // Satıcı kontrolü
       const seller = await Seller.findOne({
         where: { user_id: userId }
       });
@@ -540,83 +614,6 @@ class ReviewController {
     }
   }
 
-  // ✅ Yorumlanabilir siparişleri getirme
-  static async getReviewableOrders(req, res) {
-    try {
-      const userId = req.user.user_id || req.user.id;
-
-      console.log('📋 Yorumlanabilir siparişler getiriliyor:', userId);
-
-      // Tamamlanmış ve henüz yorumlanmamış siparişleri getir
-      const reviewableOrders = await Order.findAll({
-        where: {
-          user_id: userId,
-          order_status: { [Op.in]: ['completed', 'teslim_edildi'] }
-        },
-        include: [
-          {
-            model: OrderItem,
-            as: 'items',
-            include: [
-              {
-                model: FoodPackage,
-                as: 'package',
-                attributes: ['package_id', 'package_name', 'image_url']
-              }
-            ]
-          },
-          {
-            model: Seller,
-            as: 'seller',
-            attributes: ['seller_id', 'business_name']
-          },
-          {
-            model: Review,
-            as: 'reviews',
-            where: { user_id: userId },
-            required: false
-          }
-        ],
-        order: [['order_date', 'DESC']]
-      });
-
-      // Henüz yorumlanmamış siparişleri filtrele
-      const unreviewed = reviewableOrders.filter(order => 
-        !order.reviews || order.reviews.length === 0
-      );
-
-      const formattedOrders = unreviewed.map(order => ({
-        orderId: order.order_id,
-        orderNumber: `SP${order.order_id.toString().padStart(6, '0')}`,
-        sellerName: order.seller?.business_name || 'Satıcı',
-        sellerId: order.seller?.seller_id,
-        orderDate: order.order_date,
-        totalAmount: parseFloat(order.total_amount),
-        items: order.items?.map(item => ({
-          packageId: item.package_id,
-          packageName: item.package?.package_name || 'Ürün',
-          quantity: item.quantity,
-          imageUrl: item.package?.image_url
-        })) || []
-      }));
-
-      return res.json({
-        success: true,
-        orders: formattedOrders,
-        message: formattedOrders.length === 0 ? 'Yorumlanabilir sipariş bulunmuyor' : null
-      });
-
-    } catch (error) {
-      console.error('❌ Yorumlanabilir siparişler getirme hatası:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Siparişler getirilemedi',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-      });
-    }
-  }
-
-  // ✅ Yorum güncelleme
   static async updateReview(req, res) {
     try {
       const { reviewId } = req.params;
@@ -632,7 +629,6 @@ class ReviewController {
 
       console.log('✏️ Yorum güncelleniyor:', { reviewId, userId });
 
-      // Yorumu bul ve kullanıcının sahip olduğunu kontrol et
       const review = await Review.findOne({
         where: {
           review_id: reviewId,
@@ -647,7 +643,6 @@ class ReviewController {
         });
       }
 
-      // Güncelleme verilerini hazırla
       const updateData = {};
       if (rating !== undefined) updateData.rating = parseInt(rating);
       if (food_quality_rating !== undefined) updateData.food_quality_rating = parseInt(food_quality_rating);
@@ -656,7 +651,6 @@ class ReviewController {
       if (comment !== undefined) updateData.comment = comment;
       if (is_anonymous !== undefined) updateData.is_anonymous = Boolean(is_anonymous);
 
-      // Yorumu güncelle
       await review.update(updateData);
 
       console.log('✅ Yorum başarıyla güncellendi:', reviewId);
@@ -676,7 +670,6 @@ class ReviewController {
     }
   }
 
-  // ✅ Yorum silme
   static async deleteReview(req, res) {
     try {
       const { reviewId } = req.params;
@@ -684,7 +677,6 @@ class ReviewController {
 
       console.log('🗑️ Yorum siliniyor:', { reviewId, userId });
 
-      // Yorumu bul ve kullanıcının sahip olduğunu kontrol et
       const review = await Review.findOne({
         where: {
           review_id: reviewId,
@@ -699,7 +691,6 @@ class ReviewController {
         });
       }
 
-      // Yorumu sil
       await review.destroy();
 
       console.log('✅ Yorum başarıyla silindi:', reviewId);

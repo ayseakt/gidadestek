@@ -20,7 +20,7 @@ app.use(cors({
 app.options('*', cors());
 
 // ✅ Body parser'ları CORS'dan sonra ekle
-app.use(express.json({ limit: '10mb' })); // JSON limit ekle
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Statik dosyalar
@@ -37,7 +37,15 @@ const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes'); 
 const notificationRoutes = require('./routes/notificationRoutes');
-// ✅ API route'larını doğru sırada tanımla
+
+// ✅ Route logging middleware (debug için)
+app.use('/api/review', (req, res, next) => {
+  console.log(`🔍 Review Route: ${req.method} ${req.originalUrl}`);
+  console.log('📋 Headers:', req.headers.authorization ? 'Token var' : 'Token yok');
+  next();
+});
+
+// ✅ API route'larını tanımla
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/cart', cartRoutes);
@@ -46,56 +54,65 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/seller-locations', locationRoutes);
-app.use('/api/reviews', reviewRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
-// ✅ Test endpoint'i ekle
+
+// ✅ Review route'ları - SADECE BU SATIRDA TANIMLA
+app.use('/api/review', reviewRoutes);
+
+// ✅ Test endpoint'i
 app.get('/api/test', (req, res) => {
-  res.json({ success: true, message: 'API çalışıyor', timestamp: new Date().toISOString() });
+  res.json({ 
+    success: true, 
+    message: 'API çalışıyor', 
+    timestamp: new Date().toISOString(),
+    reviewEndpoint: '/api/review/my-reviews'
+  });
 });
 
 // Ana sayfa
 app.get('/', (req, res) => {
   res.send('SofraPay API çalışıyor! 🚀');
 });
-app.get('/api/statistics/debug', (req, res) => {
-  console.log('🐛 Statistics Debug Route Çalıştı');
+
+// ✅ Debug endpoint'i
+app.get('/api/debug/routes', (req, res) => {
   res.json({
     success: true,
-    message: 'Statistics routes çalışıyor',
-    availableRoutes: [
-      'GET /api/statistics/general',
-      'GET /api/statistics/period/:period',
-      'GET /api/statistics/charts/:type?period=30days'
-    ],
-    timestamp: new Date().toISOString()
+    message: 'Available routes',
+    routes: {
+      auth: '/api/auth/*',
+      profile: '/api/profile/*',
+      cart: '/api/cart/*',
+      packages: '/api/packages/*',
+      locations: '/api/locations/*',
+      statistics: '/api/statistics/*',
+      categories: '/api/categories/*',
+      orders: '/api/orders/*',
+      notifications: '/api/notifications/*',
+      reviews: '/api/review/*'
+    },
+    reviewRoutes: [
+      'POST /api/review/create',
+      'GET /api/review/seller/:sellerId',
+      'GET /api/review/my-reviews',
+      'POST /api/review/:reviewId/response',
+      'POST /api/review/:reviewId/helpful',
+      'PATCH /api/review/:reviewId/visibility',
+      'GET /api/review/reviewable-orders',
+      'PUT /api/review/:reviewId',
+      'DELETE /api/review/:reviewId'
+    ]
   });
 });
 
-// ✅ API route debug middleware
-app.use('/api/*', (req, res, next) => {
-  console.log(`🔍 API Route not found: ${req.method} ${req.originalUrl}`);
-  console.log('Available routes:');
-  console.log('- GET /api/statistics/general');
-  console.log('- GET /api/statistics/period/30days');
-  console.log('- GET /api/statistics/charts/daily?period=30days');
-  console.log('- POST /api/orders/create');
-  console.log('- GET /api/orders/my-orders');
-  console.log('- GET /api/orders/:orderId');
-  console.log('- PATCH /api/orders/:orderId/cancel');
-  
+// ✅ 404 handler - en sona koy
+app.use((req, res) => {
+  console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     success: false,
-    message: `API endpoint not found: ${req.method} ${req.originalUrl}`,
-    availableRoutes: [
-      'GET /api/statistics/general',
-      'GET /api/statistics/period/:period',
-      'GET /api/statistics/charts/:type',
-      'POST /api/orders/create',
-      'GET /api/orders/my-orders',
-      'GET /api/orders/:orderId',
-      'PATCH /api/orders/:orderId/cancel'
-    ]
+    message: `404 - Route not found: ${req.method} ${req.originalUrl}`,
+    suggestion: 'Check /api/debug/routes for available endpoints'
   });
 });
 
@@ -103,21 +120,10 @@ app.use('/api/*', (req, res, next) => {
 app.use((err, req, res, next) => {
   console.error('❌ Server Hatası:', err.stack);
   
-  // JSON response döndür, HTML değil
   res.status(500).json({
     success: false,
     message: 'Sunucu hatası oluştu',
     error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-  });
-});
-
-// 404 handler - JSON response
-app.use((req, res) => {
-  console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({
-    success: false,
-    message: '404 - Sayfa bulunamadı',
-    path: req.originalUrl
   });
 });
 
@@ -131,12 +137,11 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server ${PORT} portunda çalışıyor`);
       console.log(`📌 CORS: http://localhost:3000 için etkinleştirildi`);
-      console.log(`📌 Desteklenen HTTP metodları: GET, POST, PUT, DELETE, PATCH, OPTIONS`);
-      console.log(`📌 API Endpoints:`);
-      console.log(`   - POST http://localhost:${PORT}/api/orders/create`);
-      console.log(`   - GET  http://localhost:${PORT}/api/orders/my-orders`);
-      console.log(`   - GET  http://localhost:${PORT}/api/orders/:orderId`);
-      console.log(`   - PATCH http://localhost:${PORT}/api/orders/:orderId/cancel`);
+      console.log(`📌 Review API Endpoints:`);
+      console.log(`   - GET  http://localhost:${PORT}/api/review/my-reviews`);
+      console.log(`   - POST http://localhost:${PORT}/api/review/create`);
+      console.log(`   - GET  http://localhost:${PORT}/api/review/seller/:sellerId`);
+      console.log(`📌 Debug endpoint: GET http://localhost:${PORT}/api/debug/routes`);
       console.log(`📌 Test endpoint: GET http://localhost:${PORT}/api/test`);
     });
   } catch (error) {

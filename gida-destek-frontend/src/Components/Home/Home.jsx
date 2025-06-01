@@ -1,14 +1,16 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import './Home.css';
 import DonationCard from './DonationCard';
-import locationService from '../../services/locationService'; // Bu import'u ekleyin
+import locationService from '../../services/locationService';
 import { FaUser, FaBell, FaHeart, FaRegHeart,FaShoppingBag, FaMapMarkerAlt, FaClock, FaLeaf,FaSearch,FaTimes,FaMap,FaStore,FaSmile,FaPizzaSlice, FaCalendarAlt,FaCalendarCheck,  FaBolt,FaWindowClose,FaFilter,FaSortAmountDown,FaShoppingCart,FaPlus,FaMinus,FaTrash} from 'react-icons/fa';
 import FilterSidebar from './FilterSidebar';
 import packageService from '../../services/packageService';
 import cartService from '../../services/cartServices';
 import { useCart } from '../../contexts/cartContext';
 import HeroImpactSection from './HeroImpactSection';
- const Home = () => {
+
+const Home = () => {
   const { addToCart } = useCart();
   const [sortOption, setSortOption] = useState('distance');
   const [realPackages, setRealPackages] = useState([]);
@@ -29,141 +31,143 @@ import HeroImpactSection from './HeroImpactSection';
     userCount: 0,
   });
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showLocationPermission, setShowLocationPermission] = useState(false);
+  
   const [userLocation, setUserLocation] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
-  
-const categories = [
-  { name: 'Tümü', icon: '🏪' },
-  { name: 'Restoran', icon: '🍽️' },
-  { name: 'Fırın & Pastane', icon: '🥖' },
-  { name: 'Market', icon: '🛒' },
-  { name: 'Kafe', icon: '☕' },
-  { name: 'Manav', icon: '🥬' },
-  { name: 'Diğer', icon: '📦' }
-];
-// Tarih formatlaması yardımcı fonksiyonları
-const formatTime = (timeString) => {
-  if (!timeString) return 'Belirtilmemiş';
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  try {
-    let date;
-    if (timeString.length <= 8 && /^\d{2}:\d{2}:\d{2}$/.test(timeString)) {
-      // Eğer sadece saat formatındaysa, bugünün tarihiyle birleştir
-      const today = new Date().toISOString().split('T')[0]; // "2024-05-25"
-      date = new Date(`${today}T${timeString}`);
-    } else {
-      // Zaten ISO formatındaysa doğrudan parse et
-      date = new Date(timeString);
-    }
+  const categories = [
+    { name: 'Tümü', icon: '🏪' },
+    { name: 'Restoran', icon: '🍽️' },
+    { name: 'Fırın & Pastane', icon: '🥖' },
+    { name: 'Market', icon: '🛒' },
+    { name: 'Kafe', icon: '☕' },
+    { name: 'Manav', icon: '🥬' },
+    { name: 'Diğer', icon: '📦' }
+  ];
 
-    if (isNaN(date.getTime())) return 'Belirtilmemiş';
+  // Tarih formatlaması yardımcı fonksiyonları
+  const formatTime = (timeString) => {
+    if (!timeString) return 'Belirtilmemiş';
 
-    return date.toLocaleTimeString('tr-TR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch (error) {
-    console.warn('Zaman formatlaması hatası:', error);
-    return 'Belirtilmemiş';
-  }
-};
-const formatDate = (dateString) => {
-  if (!dateString) return 'Belirtilmemiş';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Belirtilmemiş';
-    return date.toLocaleDateString('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  } catch (error) {
-    console.warn('Tarih formatlaması hatası:', error);
-    return 'Belirtilmemiş';
-  }
-};
-
-const formatDateRange = (startTime, endTime) => {
-  const start = formatTime(startTime);
-  const end = formatTime(endTime);
-  if (start === 'Belirtilmemiş' || end === 'Belirtilmemiş') {
-    return 'Belirtilmemiş';
-  }
-  return `${start}-${end}`;
-};
-  // Maksimum mesafe sınırı (km)
-  const MAX_DISTANCE_KM = 10;
-  // Kullanıcının varsayılan adresini getir
-const getUserDefaultLocation = async () => {
-  try {
-    const response = await locationService.getLocations();
-    if (response.data.success) {
-      const defaultLocation = response.data.data.find(loc => loc.is_default);
-      if (defaultLocation && defaultLocation.latitude && defaultLocation.longitude) {
-        const defaultPos = {
-          lat: parseFloat(defaultLocation.latitude),
-          lng: parseFloat(defaultLocation.longitude)
-        };
-        setUserLocation(defaultPos);
-        console.log('Varsayılan adres konumu:', defaultPos);
-        return defaultPos;
+    try {
+      let date;
+      if (timeString.length <= 8 && /^\d{2}:\d{2}:\d{2}$/.test(timeString)) {
+        const today = new Date().toISOString().split('T')[0];
+        date = new Date(`${today}T${timeString}`);
+      } else {
+        date = new Date(timeString);
       }
-    }
-    // Varsayılan adres yoksa mevcut konumu al
-    return getUserCurrentLocation();
-  } catch (error) {
-    console.error('Varsayılan adres alınırken hata:', error);
-    return getUserCurrentLocation();
-  }
-};
 
-// Mevcut konum alma fonksiyonunu ayır
-const getUserCurrentLocation = () => {
-  return new Promise((resolve, reject) => {
-    if (navigator.geolocation) {
-      setIsLoadingLocation(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserLocation(userPos);
-          setIsLoadingLocation(false);
-          console.log('Mevcut konum alındı:', userPos);
-          resolve(userPos);
-        },
-        (error) => {
-          console.error("Konum alırken hata: ", error);
-          setIsLoadingLocation(false);
-          const defaultPos = { lat: 41.0082, lng: 28.9784 };
-          setUserLocation(defaultPos);
-          resolve(defaultPos);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
-        }
-      );
-    } else {
-      const defaultPos = { lat: 41.0082, lng: 28.9784 };
-      setUserLocation(defaultPos);
-      resolve(defaultPos);
+      if (isNaN(date.getTime())) return 'Belirtilmemiş';
+
+      return date.toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.warn('Zaman formatlaması hatası:', error);
+      return 'Belirtilmemiş';
     }
-  });
-};
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Belirtilmemiş';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Belirtilmemiş';
+      return date.toLocaleDateString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.warn('Tarih formatlaması hatası:', error);
+      return 'Belirtilmemiş';
+    }
+  };
+
+  const formatDateRange = (startTime, endTime) => {
+    const start = formatTime(startTime);
+    const end = formatTime(endTime);
+    if (start === 'Belirtilmemiş' || end === 'Belirtilmemiş') {
+      return 'Belirtilmemiş';
+    }
+    return `${start}-${end}`;
+  };
+
+  const MAX_DISTANCE_KM = 10;
+
+  // ⭐ FİX 1: getUserDefaultLocation fonksiyonunu düzelttik
+  const getUserDefaultLocation = async () => {
+    try {
+      console.log('🔍 Varsayılan adres aranıyor...');
+      const response = await locationService.getLocations();
+      if (response.data.success) {
+        const defaultLocation = response.data.data.find(loc => loc.is_default);
+        if (defaultLocation && defaultLocation.latitude && defaultLocation.longitude) {
+          const defaultPos = {
+            lat: parseFloat(defaultLocation.latitude),
+            lng: parseFloat(defaultLocation.longitude)
+          };
+          setUserLocation(defaultPos);
+          console.log('✅ Varsayılan adres konumu:', defaultPos);
+          return defaultPos;
+        }
+      }
+      console.log('⚠️ Varsayılan adres bulunamadı, mevcut konum alınacak');
+      return await getUserCurrentLocation();
+    } catch (error) {
+      console.error('❌ Varsayılan adres alınırken hata:', error);
+      return await getUserCurrentLocation();
+    }
+  };
+
+  const getUserCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (navigator.geolocation) {
+        setIsLoadingLocation(true);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const userPos = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+            setUserLocation(userPos);
+            setIsLoadingLocation(false);
+            console.log('✅ Mevcut konum alındı:', userPos);
+            resolve(userPos);
+          },
+          (error) => {
+            console.error("❌ Konum alırken hata: ", error);
+            setIsLoadingLocation(false);
+            const defaultPos = { lat: 41.0082, lng: 28.9784 };
+            setUserLocation(defaultPos);
+            resolve(defaultPos);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000
+          }
+        );
+      } else {
+        const defaultPos = { lat: 41.0082, lng: 28.9784 };
+        setUserLocation(defaultPos);
+        resolve(defaultPos);
+      }
+    });
+  };
 
   const loadRealPackages = async () => {
     try {
       setIsLoadingPackages(true);
       const response = await packageService.getAllActivePackages();
       if (response.data.success) {
-        console.log('Paketler yüklendi:', response.data.data);
+        console.log('📦 Paketler yüklendi:', response.data.data);
         setRealPackages(response.data.data);
         
         const totalPackages = response.data.data.length;
@@ -174,13 +178,12 @@ const getUserCurrentLocation = () => {
         });
       }
     } catch (error) {
-      console.error('Paketler yüklenirken hata:', error);
+      console.error('❌ Paketler yüklenirken hata:', error);
     } finally {
       setIsLoadingPackages(false);
     }
   };
 
-  // Sepet sayısını getir
   const loadCartCount = async () => {
     try {
       const response = await cartService.getCartCount();
@@ -188,11 +191,10 @@ const getUserCurrentLocation = () => {
         setCartCount(response.data.data.count);
       }
     } catch (error) {
-      console.error('Sepet sayısı alınırken hata:', error);
+      console.error('❌ Sepet sayısı alınırken hata:', error);
     }
   };
 
-  // Sepeti getir
   const loadCart = async () => {
     try {
       const response = await cartService.getCart();
@@ -200,116 +202,96 @@ const getUserCurrentLocation = () => {
         setCart(response.data.data.items);
       }
     } catch (error) {
-      console.error('Sepet getirilirken hata:', error);
+      console.error('❌ Sepet getirilirken hata:', error);
     }
   };
 
-  // Sepete ekle
-const handleAddToCart = async (business, quantity = 1) => {
-  console.log('=== HANDLE ADD TO CART DEBUG ===');
-  console.log('Business objesi:', business);
-  console.log('Business objesi keys:', Object.keys(business));
-  console.log('business.id:', business.id, 'Type:', typeof business.id);
-  console.log('business.realId:', business.realId, 'Type:', typeof business.realId);
-  console.log('business.packageId:', business.packageId, 'Type:', typeof business.packageId);
-  
-  if (business.isOwnPackage) {
-    alert('Kendi paketinizi sepete ekleyemezsiniz!');
-    return;
-  }
-
-  try {
-    let packageId;
+  const handleAddToCart = async (business, quantity = 1) => {
+    console.log('=== HANDLE ADD TO CART DEBUG ===');
+    console.log('Business objesi:', business);
+    console.log('Business objesi keys:', Object.keys(business));
+    console.log('business.id:', business.id, 'Type:', typeof business.id);
+    console.log('business.realId:', business.realId, 'Type:', typeof business.realId);
+    console.log('business.packageId:', business.packageId, 'Type:', typeof business.packageId);
     
-    // ⭐ DÜZELTME: Sadece integer ID'leri kullan
-    if (business.realId !== undefined && business.realId !== null && typeof business.realId === 'number') {
-      packageId = business.realId;
-      console.log('✅ realId kullanıldı:', packageId, 'Type:', typeof packageId);
-    } else if (business.packageId !== undefined && business.packageId !== null && typeof business.packageId === 'number') {
-      packageId = business.packageId;
-      console.log('✅ packageId kullanıldı:', packageId, 'Type:', typeof packageId);
-    } else if (business.id !== undefined && business.id !== null && typeof business.id === 'number') {
-      packageId = business.id;
-      console.log('✅ id kullanıldı:', packageId, 'Type:', typeof packageId);
-    } else {
-      // ⭐ Son çare: String parse etmeye çalış
-      console.warn('⚠️ Numeric ID bulunamadı, string parse deneniyor...');
-      
-      let stringId = business.realId || business.packageId || business.id;
-      console.log('String parse denenen değer:', stringId, 'Type:', typeof stringId);
-      
-      if (typeof stringId === 'string' && stringId.startsWith('real_')) {
-        const parsed = parseInt(stringId.replace('real_', ''), 10);
-        if (!isNaN(parsed) && parsed > 0) {
-          packageId = parsed;
-          console.log('✅ String parse başarılı:', packageId);
-        }
-      } else if (typeof stringId === 'string') {
-        const parsed = parseInt(stringId, 10);
-        if (!isNaN(parsed) && parsed > 0) {
-          packageId = parsed;
-          console.log('✅ Direct string parse başarılı:', packageId);
-        }
-      }
-      
-      if (!packageId) {
-        console.error('❌ Hiçbir geçerli ID bulunamadı!');
-        console.error('Business objesi detayları:', {
-          id: business.id,
-          idType: typeof business.id,
-          realId: business.realId,
-          realIdType: typeof business.realId,
-          packageId: business.packageId,
-          packageIdType: typeof business.packageId,
-          allKeys: Object.keys(business)
-        });
-        alert('Paket ID\'si bulunamadı veya geçersiz');
-        return;
-      }
-    }
-
-    if (typeof packageId !== 'number' || isNaN(packageId) || packageId <= 0) {
-      console.error('❌ Final validation failed - Geçersiz packageId:', packageId, 'Type:', typeof packageId);
-      alert('Geçersiz paket ID');
+    if (business.isOwnPackage) {
+      alert('Kendi paketinizi sepete ekleyemezsiniz!');
       return;
     }
 
-    console.log('✅ FINAL packageId kullanılacak:', packageId, 'Type:', typeof packageId);
-    
-    // ⭐ cartService.addToCart çağrısı
-    const response = await cartService.addToCart(packageId, quantity);
-    
-    if (response.data.success) {
-      await loadCartCount();
-      setImpactStats(prev => ({
-        ...prev,
-        savedFood: prev.savedFood + 1,
-        co2Reduced: prev.co2Reduced + 2,
-      }));
+    try {
+      let packageId;
       
-      alert(`${business.storeName} işletmesinden "${business.product}" ürünü sepete eklendi!`);
-      if (showProductDetail) {
-        setShowProductDetail(false);
+      if (business.realId !== undefined && business.realId !== null && typeof business.realId === 'number') {
+        packageId = business.realId;
+        console.log('✅ realId kullanıldı:', packageId, 'Type:', typeof packageId);
+      } else if (business.packageId !== undefined && business.packageId !== null && typeof business.packageId === 'number') {
+        packageId = business.packageId;
+        console.log('✅ packageId kullanıldı:', packageId, 'Type:', typeof packageId);
+      } else if (business.id !== undefined && business.id !== null && typeof business.id === 'number') {
+        packageId = business.id;
+        console.log('✅ id kullanıldı:', packageId, 'Type:', typeof packageId);
+      } else {
+        console.warn('⚠️ Numeric ID bulunamadı, string parse deneniyor...');
+        
+        let stringId = business.realId || business.packageId || business.id;
+        console.log('String parse denenen değer:', stringId, 'Type:', typeof stringId);
+        
+        if (typeof stringId === 'string' && stringId.startsWith('real_')) {
+          const parsed = parseInt(stringId.replace('real_', ''), 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            packageId = parsed;
+            console.log('✅ String parse başarılı:', packageId);
+          }
+        } else if (typeof stringId === 'string') {
+          const parsed = parseInt(stringId, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            packageId = parsed;
+            console.log('✅ Direct string parse başarılı:', packageId);
+          }
+        }
+        
+        if (!packageId) {
+          console.error('❌ Hiçbir geçerli ID bulunamadı!');
+          alert('Paket ID\'si bulunamadı veya geçersiz');
+          return;
+        }
+      }
+
+      if (typeof packageId !== 'number' || isNaN(packageId) || packageId <= 0) {
+        console.error('❌ Final validation failed - Geçersiz packageId:', packageId, 'Type:', typeof packageId);
+        alert('Geçersiz paket ID');
+        return;
+      }
+
+      console.log('✅ FINAL packageId kullanılacak:', packageId, 'Type:', typeof packageId);
+      
+      const response = await cartService.addToCart(packageId, quantity);
+      
+      if (response.data.success) {
+        await loadCartCount();
+        setImpactStats(prev => ({
+          ...prev,
+          savedFood: prev.savedFood + 1,
+          co2Reduced: prev.co2Reduced + 2,
+        }));
+        
+        alert(`${business.storeName} işletmesinden "${business.product}" ürünü sepete eklendi!`);
+        if (showProductDetail) {
+          setShowProductDetail(false);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ handleAddToCart hatası:', error);
+      if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      } else {
+        alert('Sepete eklenirken bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
       }
     }
-    
-  } catch (error) {
-    console.error('handleAddToCart hatası:', error);
-    console.error('Error response:', error.response?.data);
-    console.error('Error status:', error.response?.status);
-    
-    if (error.response?.status === 400) {
-      console.error('400 Hatası - Request payload:', error.config?.data);
-      console.error('Backend response:', error.response?.data);
-    }
-    if (error.response?.data?.message) {
-      alert(error.response.data.message);
-    } else {
-      alert('Sepete eklenirken bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
-    }
-  }
-};
-  // Sepet öğesi güncelle
+  };
+
   const handleUpdateCartItem = async (cartItemId, quantity) => {
     try {
       if (quantity === 0) {
@@ -323,14 +305,13 @@ const handleAddToCart = async (business, quantity = 1) => {
         await loadCartCount();
       }
     } catch (error) {
-      console.error('Sepet güncelleme hatası:', error);
+      console.error('❌ Sepet güncelleme hatası:', error);
       if (error.response?.data?.message) {
         alert(error.response.data.message);
       }
     }
   };
 
-  // Sepetten kaldır
   const handleRemoveFromCart = async (cartItemId) => {
     try {
       const response = await cartService.removeFromCart(cartItemId);
@@ -340,14 +321,13 @@ const handleAddToCart = async (business, quantity = 1) => {
         alert('Ürün sepetten kaldırıldı');
       }
     } catch (error) {
-      console.error('Sepetten kaldırma hatası:', error);
+      console.error('❌ Sepetten kaldırma hatası:', error);
       if (error.response?.data?.message) {
         alert(error.response.data.message);
       }
     }
   };
 
-  // Sepeti temizle
   const handleClearCart = async () => {
     if (window.confirm('Sepeti tamamen temizlemek istediğinizden emin misiniz?')) {
       try {
@@ -358,12 +338,12 @@ const handleAddToCart = async (business, quantity = 1) => {
           alert('Sepet temizlendi');
         }
       } catch (error) {
-        console.error('Sepet temizleme hatası:', error);
+        console.error('❌ Sepet temizleme hatası:', error);
       }
     }
   };
 
-  // Google Maps API script yükleme
+  // Google Maps fonksiyonları (değişiklik yok)
   const loadGoogleMapsScript = () => {
     if (!window.google) {
       const script = document.createElement('script');
@@ -384,7 +364,6 @@ const handleAddToCart = async (business, quantity = 1) => {
     }
   };
 
-  // Harita başlatma
   const initMap = () => {
     if (!window.google || !mapRef.current) return;
 
@@ -592,7 +571,6 @@ const handleAddToCart = async (business, quantity = 1) => {
         });
 
         marker.addListener("click", () => {
-          // Diğer açık infowindow'ları kapat
           if (window.currentInfoWindow) {
             window.currentInfoWindow.close();
           }
@@ -600,7 +578,6 @@ const handleAddToCart = async (business, quantity = 1) => {
           window.currentInfoWindow = infowindow;
         });
 
-        // Global fonksiyonları tanımla
         window.handleMapPopupAddToCart = (businessId) => {
           const business = validRealPackages.find(b => b.realId === businessId);
           if (business) {
@@ -620,6 +597,7 @@ const handleAddToCart = async (business, quantity = 1) => {
             }
           }
         };
+
         window.handleMapPopupDirections = (businessId) => {
           const business = validRealPackages.find(b => b.realId === businessId);
           if (business && business.location) {
@@ -635,12 +613,11 @@ const handleAddToCart = async (business, quantity = 1) => {
       }
     });
   };
-  // Kullanıcı konumunu al
-const getUserLocation = async () => {
-  await getUserDefaultLocation();
-};
 
-  // Mesafe hesaplama (Haversine formülü)
+  const getUserLocation = async () => {
+    await getUserDefaultLocation();
+  };
+
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -654,89 +631,85 @@ const getUserLocation = async () => {
     return distance;
   };
 
-  // Gerçek paket verilerini dönüştür
-const convertRealPackageToBusinessFormat = (packageData) => {
-  if (!packageData || typeof packageData !== 'object') {
-    console.warn('Geçersiz paket verisi:', packageData);
-    return null;
-  }
-if (!packageData.package_id) {
-    console.warn('Eksik package_id:', packageData);
-    return null;
-  }
+  const convertRealPackageToBusinessFormat = (packageData) => {
+    if (!packageData || typeof packageData !== 'object') {
+      console.warn('Geçersiz paket verisi:', packageData);
+      return null;
+    }
 
-  const packageId = parseInt(packageData.package_id);
-  if (isNaN(packageId)) {
-    console.warn('Geçersiz package_id:', packageData.package_id);
-    return null;
-  }
+    if (!packageData.package_id) {
+      console.warn('Eksik package_id:', packageData);
+      return null;
+    }
 
-  if (!packageData.location || 
-      !packageData.location.latitude || 
-      !packageData.location.longitude ||
-      packageData.location.latitude === null ||
-      packageData.location.longitude === null) {
-    console.warn('Paket konum verisi eksik:', packageData.package_id);
-    return null;
-  }
+    const packageId = parseInt(packageData.package_id);
+    if (isNaN(packageId)) {
+      console.warn('Geçersiz package_id:', packageData.package_id);
+      return null;
+    }
 
-  const lat = parseFloat(packageData.location.latitude);
-  const lng = parseFloat(packageData.location.longitude);
+    if (!packageData.location || 
+        !packageData.location.latitude || 
+        !packageData.location.longitude ||
+        packageData.location.latitude === null ||
+        packageData.location.longitude === null) {
+      console.warn('Paket konum verisi eksik:', packageData.package_id);
+      return null;
+    }
 
-  if (isNaN(lat) || isNaN(lng)) {
-    console.warn('Geçersiz koordinatlar:', { lat, lng });
-    return null;
-  }
+    const lat = parseFloat(packageData.location.latitude);
+    const lng = parseFloat(packageData.location.longitude);
 
-  let distance = '500m';
-  let actualDistance = 999;
+    if (isNaN(lat) || isNaN(lng)) {
+      console.warn('Geçersiz koordinatlar:', { lat, lng });
+      return null;
+    }
 
-  if (userLocation) {
-    actualDistance = calculateDistance(
-      userLocation.lat, 
-      userLocation.lng, 
-      lat, 
-      lng
-    );
+    let distance = '500m';
+    let actualDistance = 999;
+
+    if (userLocation) {
+      actualDistance = calculateDistance(
+        userLocation.lat, 
+        userLocation.lng, 
+        lat, 
+        lng
+      );
+      
+      distance = actualDistance < 1 ? 
+        `${Math.round(actualDistance * 1000)}m` : 
+        `${actualDistance.toFixed(1)}km`;
+    }
+
+    const timeDisplay = formatDateRange(packageData.pickup_start_time, packageData.pickup_end_time);
     
-    distance = actualDistance < 1 ? 
-      `${Math.round(actualDistance * 1000)}m` : 
-      `${actualDistance.toFixed(1)}km`;
-  }
+    let categoryName = 'Diğer';
+    if (packageData.category && packageData.category.name) {
+      categoryName = packageData.category.name;
+    } else {
+      const categoryMap = {
+        1: 'Restoran',
+        2: 'Fırın & Pastane', 
+        3: 'Market',
+        4: 'Kafe',
+        5: 'Manav',
+        6: 'Diğer'
+      };
+      categoryName = categoryMap[packageData.category_id] || 'Diğer';
+    }
 
-  // Zaman formatlaması - pickup_start_time ve pickup_end_time kullan
-  const timeDisplay = formatDateRange(packageData.pickup_start_time, packageData.pickup_end_time);
-  // Kategori mapping - category ilişkisinden al
-  let categoryName = 'Diğer';
-  if (packageData.category && packageData.category.name) {
-    categoryName = packageData.category.name;
-  } else {
-    // Fallback kategori mapping
-    const categoryMap = {
-      1: 'Restoran',
-      2: 'Fırın & Pastane', 
-      3: 'Market',
-      4: 'Kafe',
-      5: 'Manav',
-      6: 'Diğer'
+    let imageUrl = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop';
+    
+    const categoryImages = {
+      'Restoran': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
+      'Fırın & Pastane': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&h=200&fit=crop',
+      'Market': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
+      'Kafe': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop',
+      'Manav': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&h=200&fit=crop',
+      'Diğer': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop'
     };
-    categoryName = categoryMap[packageData.category_id] || 'Diğer';
-  }
-
-  // Resim URL'si - eğer varsa kullan, yoksa default
-  let imageUrl = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop';
-  
-  // Kategoriye göre default resimler
-  const categoryImages = {
-    'Restoran': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
-    'Fırın & Pastane': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&h=200&fit=crop',
-    'Market': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
-    'Kafe': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop',
-    'Manav': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&h=200&fit=crop',
-    'Diğer': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop'
-  };
-  
-  imageUrl = categoryImages[categoryName] || imageUrl;
+    
+    imageUrl = categoryImages[categoryName] || imageUrl;
 
   return {
     id: packageId,
@@ -847,17 +820,8 @@ if (!packageData.package_id) {
     localStorage.setItem('onboardingShown', 'true');
   };
 
-  const allowLocationPermission = () => {
-    setShowLocationPermission(false);
-    localStorage.setItem('locationPermissionShown', 'true');
-    getUserLocation();
-  };
 
-  const declineLocationPermission = () => {
-    setShowLocationPermission(false);
-    localStorage.setItem('locationPermissionShown', 'true');
-    setUserLocation({ lat: 41.0082, lng: 28.9784 });
-  };
+
 
   const handleMapButtonClick = () => {
     setShowMapView(!showMapView);
@@ -874,31 +838,83 @@ if (!packageData.package_id) {
   };
 
   // İlk yükleme
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    setCurrentUserId(user.user_id || user.id);
-    
-    if (!localStorage.getItem('onboardingShown')) {
-      setShowOnboarding(true);
-    }
+useEffect(() => {
+  const initializeApp = async () => {
+    console.log('⏳ initializeApp başladı');
+    try {
+      setIsInitializing(true);
 
-    if (!localStorage.getItem('locationPermissionShown')) {
-      setTimeout(() => {
-        setShowLocationPermission(true);
-      }, 1000);
-    } else {
-      // getUserLocation yerine getUserDefaultLocation çağır
-      getUserDefaultLocation();
-    }
+      // 1. Kullanıcı kontrolü
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        console.log('🚫 Kullanıcı verisi yok, giriş sayfasına yönlendirme');
+        window.location.href = '/login';
+        return;
+      }
 
-    const savedFavorites = localStorage.getItem('favorites');
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
-    }
+      let user;
+      try {
+        user = JSON.parse(userData);
+      } catch (parseError) {
+        console.error('❌ Kullanıcı verisi parse edilemedi:', parseError);
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return;
+      }
 
-    loadRealPackages();
-    loadCartCount();
-  }, []);
+      if (!user || (!user.user_id && !user.id)) {
+        console.log('⚠️ Geçersiz kullanıcı bilgisi');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return;
+      }
+
+      const finalUserId = user.user_id || user.id;
+      setCurrentUserId(finalUserId);
+      console.log('✅ Kullanıcı ID set edildi:', finalUserId);
+
+      // 2. Onboarding kontrolü
+      if (!localStorage.getItem('onboardingShown')) {
+        setShowOnboarding(true);
+      }
+
+      // 3. Konum bilgisi her zaman alınacak
+// 3. Konum bilgisi her zaman alınacak
+      try {
+        const location = await getUserDefaultLocation();
+        console.log('📍 Kullanıcı konumu:', location);
+      } catch (error) {
+        console.error('🌍 Konum bilgisi alınamadı:', error);
+        // Hata durumunda varsayılan konumu set et
+        setUserLocation({ lat: 41.0082, lng: 28.9784 });
+      }
+
+      // 4. Favoriler
+      const savedFavorites = localStorage.getItem('favorites');
+      if (savedFavorites) {
+        try {
+          setFavorites(JSON.parse(savedFavorites));
+        } catch (favError) {
+          console.error('⭐ Favoriler parse hatası:', favError);
+        }
+      }
+
+      // 5. Paket ve sepet verilerini paralel yükle
+      await Promise.all([
+        loadRealPackages().catch(err => console.error('📦 Paket yükleme hatası:', err)),
+        loadCartCount().catch(err => console.error('🛒 Sepet sayısı hatası:', err))
+      ]);
+    } catch (error) {
+      console.error('🔥 Uygulama başlatılırken genel hata:', error);
+    } finally {
+      setIsInitializing(false);
+      console.log('🏁 initializeApp bitti, loading kapatılıyor');
+    }
+  };
+
+  initializeApp();
+}, []);
+
 
   useEffect(() => {
     localStorage.setItem('favorites', JSON.stringify(favorites));
@@ -915,7 +931,25 @@ if (!packageData.package_id) {
       loadCart();
     }
   }, [showCart]);
+// Loading state kontrolü
+if (isInitializing) {
+  console.log('🔄 Uygulama yükleniyor...');
+  return (
+    <div className="app-loading">
+      <div className="loading-spinner"></div>
+      <p>Uygulama yükleniyor...</p>
+    </div>
+  );
+}
 
+// Kullanıcı doğrulaması
+if (!currentUserId) {
+  return (
+    <div className="auth-error">
+      <p>Oturum bulunamadı. Yönlendiriliyorsunuz...</p>
+    </div>
+  );
+}
   return (
     <>
       {showOnboarding && (
@@ -1147,7 +1181,7 @@ if (!packageData.package_id) {
       </button>
 
       {/* Konum İzni */}
-      {showLocationPermission && (
+      {/* {showLocationPermission && (
         <div className="location-permission-overlay">
           <div className="permission-container">
             <div className="permission-icon">
@@ -1167,7 +1201,7 @@ if (!packageData.package_id) {
             </div>
           </div>
         </div>
-      )}
+      )} */}
       {/* Product Detail Popup */}
       {showProductDetail && selectedProduct && (
         <div className="product-detail-overlay" onClick={closeProductDetail}>

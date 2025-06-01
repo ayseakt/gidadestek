@@ -102,7 +102,7 @@ exports.signup = async (req, res) => {
     }
 };
 
-// Kullanıcı girişi - DÜZELTME
+// Kullanıcı girişi - DÜZELTME - ALIAS EKLENDİ
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -115,16 +115,18 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Kullanıcıyı bul
+    // Kullanıcıyı bul - ALIAS'LAR EKLENDİ
     const user = await User.findOne({ 
       where: { email },
       include: [
         { 
           model: UserProfile,
+          as: 'profile', // User.js'deki alias ile aynı
           required: false // LEFT JOIN yapar, UserProfile yoksa da user'ı getirir
         }, 
         { 
           model: Seller,
+          as: 'seller', // User.js'deki alias ile aynı
           required: false // LEFT JOIN yapar, Seller yoksa da user'ı getirir
         }
       ]
@@ -167,8 +169,8 @@ exports.login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Kullanıcı bilgilerini hazırla - NULL KONTROL EKLEME
-    const userProfile = user.UserProfile;
+    // Kullanıcı bilgilerini hazırla - ALIAS KULLANIMI DÜZELTİLDİ
+    const userProfile = user.profile; // user.UserProfile yerine user.profile
     let fullName = 'Kullanıcı'; // Varsayılan isim
     
     if (userProfile && userProfile.first_name) {
@@ -186,7 +188,7 @@ exports.login = async (req, res) => {
         email: user.email,
         name: fullName,
         phone: user.phone_number,
-        isSeller: !!(user.Seller) // Satıcı olup olmadığı bilgisini ekle
+        isSeller: !!(user.seller) // user.Seller yerine user.seller
       }
     });
   } catch (error) {

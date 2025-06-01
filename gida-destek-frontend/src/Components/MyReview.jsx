@@ -18,91 +18,70 @@ const MyReviews = () => {
   const navigate = useNavigate();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, recent, high-rated, low-rated
   const [sortBy, setSortBy] = useState('newest'); // newest, oldest, rating-high, rating-low
 
-  // Mock data - gerçek uygulamada API'den gelecek
-  const mockReviews = [
-    {
-      review_id: 1,
-      seller_name: "Ada Market",
-      seller_id: 1,
-      order_id: 101,
-      package_id: null,
-      rating: 5,
-      food_quality_rating: 5,
-      service_rating: 4,
-      value_rating: 5,
-      comment: "Çok taze ve lezzetli ürünler vardı. Özellikle evde yapılan börek harikaydı!",
-      is_visible: true,
-      is_anonymous: false,
-      helpful_count: 3,
-      response_text: "Değerli görüşünüz için teşekkür ederiz!",
-      response_date: "2024-01-15T14:30:00Z",
-      created_at: "2024-01-14T18:45:00Z",
-      product_name: "Karma Paket",
-      product_image: "https://via.placeholder.com/100"
-    },
-    {
-      review_id: 2,
-      seller_name: "Lezzet Durağı",
-      seller_id: 2,
-      order_id: 102,
-      package_id: 25,
-      rating: 4,
-      food_quality_rating: 4,
-      service_rating: 4,
-      value_rating: 3,
-      comment: "Genel olarak memnunum ama fiyat biraz yüksek geldi.",
-      is_visible: true,
-      is_anonymous: true,
-      helpful_count: 1,
-      response_text: null,
-      response_date: null,
-      created_at: "2024-01-12T12:20:00Z",
-      product_name: "Pizza Dilimi Paketi",
-      product_image: "https://via.placeholder.com/100"
-    },
-    {
-      review_id: 3,
-      seller_name: "Tatlı Köşe",
-      seller_id: 3,
-      order_id: 103,
-      package_id: null,
-      rating: 3,
-      food_quality_rating: 3,
-      service_rating: 2,
-      value_rating: 4,
-      comment: "Tatlılar güzeldi ama servis biraz gecikmişti.",
-      is_visible: false,
-      is_anonymous: false,
-      helpful_count: 0,
-      response_text: "Özür dileriz, bir dahaki sefere daha hızlı olacağız.",
-      response_date: "2024-01-08T16:15:00Z",
-      created_at: "2024-01-07T20:10:00Z",
-      product_name: "Tatlı Çeşitleri",
-      product_image: "https://via.placeholder.com/100"
-    }
-  ];
 
-  useEffect(() => {
-    // Gerçek uygulamada API çağrısı yapılacak
-    const fetchReviews = async () => {
-      try {
-        setLoading(true);
-        // API çağrısı burada olacak
-        // const response = await fetch('/api/user/reviews');
-        // const data = await response.json();
-        
-        // Mock data kullanıyoruz
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Loading simulation
-        setReviews(mockReviews);
-      } catch (error) {
-        console.error('Değerlendirmeler yüklenirken hata oluştu:', error);
-      } finally {
-        setLoading(false);
+useEffect(() => {
+  const fetchReviews = async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
+      if (!token) {
+        console.error('Token bulunamadı');
+        return;
       }
-    };
+
+      // ✅ Doğru endpoint URL'si
+      const response = await fetch('http://localhost:5051/api/review/my-reviews', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // ✅ Response kontrolü ekleyin
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (!response.ok) {
+        // ✅ Eğer response HTML ise, metin olarak oku
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+          const htmlText = await response.text();
+          console.error('HTML Response alındı:', htmlText.substring(0, 200));
+          throw new Error(`HTTP ${response.status}: Server HTML döndürdü`);
+        }
+        
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'API Hatası');
+      }
+
+      const data = await response.json();
+      console.log('✅ Reviews data:', data);
+      
+      // State'i güncelle
+      if (data.success && data.reviews) {
+        setReviews(data.reviews);
+      }
+      
+    } catch (error) {
+      console.error('Değerlendirmeler yüklenirken hata oluştu:', error);
+      
+      // ✅ Daha anlamlı hata mesajları
+      if (error.message.includes('HTML döndürdü')) {
+        setError('Sunucu yanıt veremedi. API endpoint\'i kontrol edin.');
+      } else if (error.message.includes('JSON')) {
+        setError('Sunucudan geçersiz yanıt alındı.');
+      } else {
+        setError(error.message || 'Değerlendirmeler yüklenemedi');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchReviews();
   }, []);
@@ -181,6 +160,20 @@ const MyReviews = () => {
         <div className="loading-screen">
           <div className="loading-spinner"></div>
           <p>Değerlendirmeleriniz yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="my-reviews-container">
+        <div className="error-screen">
+          <h2>Hata Oluştu</h2>
+          <p>{error}</p>
+          <button className="retry-button" onClick={() => window.location.reload()}>
+            Tekrar Dene
+          </button>
         </div>
       </div>
     );
