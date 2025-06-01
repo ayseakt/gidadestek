@@ -3,9 +3,9 @@ const express = require('express');
 const router = express.Router();
 const NotificationController = require('../controllers/notificationController');
 
-// Middleware'ler (örnek - kendi middleware'lerinizi kullanın)
-const authMiddleware = require('../middlewares/auth'); // JWT doğrulama
-const adminMiddleware = require('../middlewares/admin'); // Admin kontrolü
+// Middleware'ler - dosya yollarını kontrol edin
+const authMiddleware = require('../middleware/authMiddleware'); // Tam dosya adıyla
+// const adminMiddleware = require('../middlewares/admin'); // Bu dosya yoksa yoruma alın
 
 // 🔐 Tüm route'lar authentication gerektirir
 router.use(authMiddleware);
@@ -78,6 +78,7 @@ router.delete('/read', NotificationController.deleteReadNotifications);
 router.put('/preferences', NotificationController.updateNotificationPreferences);
 
 // 🎯 ADMİN ROUTE'LARI (Admin middleware gerekir)
+// Admin middleware dosyanız yoksa bu kısımları yoruma alın
 
 /**
  * @route   POST /api/notifications/admin/bulk-send
@@ -85,13 +86,13 @@ router.put('/preferences', NotificationController.updateNotificationPreferences)
  * @access  Admin
  * @body    userIds[], title, message, type, targetGroup
  */
-router.post('/admin/bulk-send', adminMiddleware, NotificationController.sendBulkNotification);
+// router.post('/admin/bulk-send', adminMiddleware, NotificationController.sendBulkNotification);
 
 /**
  * @route   POST /api/notifications/admin/cleanup
  * @desc    Eski bildirimleri temizle
  * @access  Admin
  */
-router.post('/admin/cleanup', adminMiddleware, NotificationController.cleanupOldNotifications);
+// router.post('/admin/cleanup', adminMiddleware, NotificationController.cleanupOldNotifications);
 
 module.exports = router;
