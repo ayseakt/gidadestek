@@ -64,7 +64,9 @@ const packageService = {
   getAllActivePackages: () => {
     return api.get('/packages/all-active');
   },
-    
+getAllActivePackagesWithImages: () => {
+  return api.get('/packages/all-active-with-categories'); // Bu endpoint'i kullanın
+},
   /**
    * Kullanıcının kendi paketlerini getirir
    */

@@ -771,6 +771,116 @@ const getOrderStatusInfo = (status) => {
       setLoading(false);
     }
   };
+const handleImageError = (e, paket) => {
+  console.log('❌ Resim yüklenemedi:', e.target.src);
+  console.log('📦 Paket bilgisi:', paket);
+  
+  // Sonsuz döngüyü önlemek için flag kullan
+  if (!e.target.dataset.errorHandled) {
+    e.target.dataset.errorHandled = 'true';
+    
+    // Öncelikle data URL ile base64 placeholder dene
+    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPllFTUVLPC90ZXh0Pgo8L3N2Zz4K';
+  }
+};
+
+// 2. getImageUrl fonksiyonunu debug bilgileriyle güncelleyin
+const getImageUrl = (paket) => {
+  console.log('🖼️ getImageUrl çağrıldı:', paket);
+  
+  try {
+    // Paket nesnesinden resim yolunu al
+    let imagePath = '';
+    
+    // Tüm olası alan isimlerini kontrol et ve debug bilgisi ver
+    const possibleImageFields = [
+      'image_url', 'imageUrl', 'image_path', 'image', 
+      'photo_url', 'picture_url', 'thumbnail'
+    ];
+    
+    console.log('🔍 Paket içindeki tüm alanlar:', Object.keys(paket));
+    
+    for (const field of possibleImageFields) {
+      if (paket[field]) {
+        imagePath = paket[field];
+        console.log(`✅ Resim alanı bulundu: ${field} = ${imagePath}`);
+        break;
+      }
+    }
+    
+    // Images array'ini kontrol et
+    if (!imagePath && paket.images && Array.isArray(paket.images) && paket.images.length > 0) {
+      const firstImage = paket.images[0];
+      imagePath = firstImage.image_url || firstImage.path || firstImage.url || firstImage;
+      console.log('📸 Images array\'den alınan:', imagePath);
+    }
+    
+    if (!imagePath) {
+      console.warn('⚠️ Paket için resim yolu bulunamadı, varsayılan resim kullanılacak');
+      // Base64 placeholder döndür
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPllFTUVLPC90ZXh0Pgo8L3N2Zz4K';
+    }
+    
+    // Path'i normalize et
+    let normalizedPath = imagePath.replace(/\\/g, '/');
+    
+    // Eğer zaten tam URL ise direkt return et
+    if (normalizedPath.startsWith('http')) {
+      console.log('🔗 Tam URL bulundu:', normalizedPath);
+      return normalizedPath;
+    }
+    
+    // Başında / yoksa ekle
+    if (!normalizedPath.startsWith('/')) {
+      normalizedPath = '/' + normalizedPath;
+    }
+    
+    // Backend URL'ini oluştur - API URL'den base URL'i çıkar
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5051/api';
+    const baseURL = apiUrl.replace('/api', ''); // /api kısmını çıkar
+    const fullImageUrl = `${baseURL}${normalizedPath}`;
+    
+    console.log('🔗 API URL:', apiUrl);
+    console.log('🔗 Base URL:', baseURL);
+    console.log('🔗 Oluşturulan tam resim URL:', fullImageUrl);
+    
+    // URL'in erişilebilir olup olmadığını kontrol et (opsiyonel)
+    return fullImageUrl;
+    
+  } catch (error) {
+    console.error('❌ getImageUrl fonksiyonunda hata:', error);
+    // Hata durumunda base64 placeholder döndür
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPllFTUVLPC90ZXh0Pgo8L3N2Zz4K';
+  }
+};
+
+const getImageUrlAlternative = (paket) => {
+  try {
+    let imagePath = paket.image_url || paket.imageUrl || paket.image_path || paket.image;
+    
+    if (paket.images && paket.images.length > 0 && !imagePath) {
+      imagePath = paket.images[0].image_url || paket.images[0].path || paket.images[0];
+    }
+    
+    if (!imagePath) return '/default-package-image.jpg';
+    
+    // Windows path'lerini düzelt
+    const normalizedPath = imagePath.replace(/\\/g, '/');
+    
+    // Eğer zaten tam URL ise direkt return et
+    if (normalizedPath.startsWith('http')) {
+      return normalizedPath;
+    }
+    
+    // Backend'in static file serving endpoint'i (genellikle /uploads)
+    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    return `${baseURL}/${normalizedPath.startsWith('/') ? normalizedPath.slice(1) : normalizedPath}`;
+    
+  } catch (error) {
+    console.error('Resim URL oluşturma hatası:', error);
+    return '/default-package-image.jpg';
+  }
+};
   // Geçmiş paketleri yükleme fonksiyonu 
   const refreshPackageHistory = async () => {
     try {
@@ -879,6 +989,7 @@ const getOrderStatusInfo = (status) => {
               } else if (response.data.packages && Array.isArray(response.data.packages)) {
                 packagesData = response.data.packages;
               }
+              console.log('Yüklenen paketler:', packagesData);
             }
             
             setPaketlerim(packagesData);
@@ -1372,8 +1483,26 @@ const getOrderStatusInfo = (status) => {
               {paketlerim.map((paket, index) => (
                 <div key={paket.id || index} className="paket-card">
                   <div className="paket-image">
-                    <img src={paket.fotograf || '/assets/placeholder-food.png'} alt={paket.baslik} />
+                    <img
+                      src={
+                        paket.images && paket.images.length > 0
+                          ? `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000'}${paket.images[0].image_url || paket.images[0].image_path}`
+                          : '/assets/placeholder-food.png'
+                      }
+                      alt={paket.package_name || paket.baslik}
+                      style={{ 
+                        width: '100%', 
+                        height: '200px', 
+                        objectFit: 'cover', 
+                        borderRadius: '8px' 
+                      }}
+                      onError={(e) => {
+                        console.error('Resim yüklenemedi:', e.target.src);
+                        e.target.src = '/assets/placeholder-food.png';
+                      }}
+                    />
                   </div>
+
                   <div className="paket-details">
                     <h3>{paket.package_name || paket.baslik}</h3>
                     <div className="price-container">

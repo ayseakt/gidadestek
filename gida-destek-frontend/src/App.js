@@ -14,7 +14,7 @@ import './App.css';
 import SellerProfile from './Components/SellerProfile';
 import IncominOrder from './Components/InCominOrder';
 import MyReviews from './Components/MyReview';
-
+import SellerReviews from './Components/Home/SellerReview';
 const MainScreen = ({ userData, onLogout }) => {
   return (
     <>
@@ -26,6 +26,7 @@ const MainScreen = ({ userData, onLogout }) => {
           <Route path="/paketlerim" element={<IncominOrder />} />
           <Route path="/aldiklarim" element={<MyOrders />} />
           <Route path="/degerlerim" element={<MyReviews />} />
+          <Route path="/degerlendirmeler" element={<SellerReviews />} />
           <Route path="/profil" element={<UserProfile userData={userData} />} />
           <Route path="/favoriler" element={<Favorites />} />
           <Route path="/odeme" element={<PaymentPage />} /> 

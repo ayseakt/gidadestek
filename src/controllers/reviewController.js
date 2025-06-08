@@ -5,7 +5,8 @@ const {
   Seller, 
   Order, 
   FoodPackage,
-  OrderItem
+  OrderItem,
+  sequelize
 } = require('../models');
 const { Op } = require('sequelize');
 
@@ -372,6 +373,195 @@ static async getUserReviews(req, res) {
       });
     }
   }
+  // ReviewController.js - Bu metodu ekleyin
+
+static async getMySellerReviews(req, res) {
+  try {
+    const userId = req.user.user_id || req.user.id;
+    const { page = 1, limit = 20, filter = 'all', sort = 'newest' } = req.query;
+
+    console.log('📋 Satıcının aldığı yorumlar getiriliyor:', { userId, filter, sort });
+
+    // Kullanıcının satıcı hesabını bul
+    const seller = await Seller.findOne({
+      where: { user_id: userId },
+      attributes: ['seller_id', 'business_name']
+    });
+
+    if (!seller) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu işlem için satıcı yetkisi gereklidir'
+      });
+    }
+
+    // Filtreleme koşulları
+    let whereConditions = {
+      seller_id: seller.seller_id,
+      is_visible: true
+    };
+
+    // Tarih filtreleri
+    if (filter === 'recent') {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      whereConditions.created_at = {
+        [Op.gte]: weekAgo
+      };
+    } else if (filter === 'high-rated') {
+      whereConditions.rating = {
+        [Op.gte]: 4
+      };
+    } else if (filter === 'low-rated') {
+      whereConditions.rating = {
+        [Op.lte]: 3
+      };
+    } else if (filter === 'responded') {
+      whereConditions.response_text = {
+        [Op.not]: null
+      };
+    } else if (filter === 'needs-response') {
+      whereConditions.response_text = null;
+    }
+
+    // Sıralama
+    let orderClause;
+    switch (sort) {
+      case 'oldest':
+        orderClause = [['created_at', 'ASC']];
+        break;
+      case 'rating-high':
+        orderClause = [['rating', 'DESC'], ['created_at', 'DESC']];
+        break;
+      case 'rating-low':
+        orderClause = [['rating', 'ASC'], ['created_at', 'DESC']];
+        break;
+      case 'needs-response':
+        orderClause = [
+          [sequelize.literal('CASE WHEN response_text IS NULL THEN 0 ELSE 1 END'), 'ASC'],
+          ['created_at', 'DESC']
+        ];
+        break;
+      default: // newest
+        orderClause = [['created_at', 'DESC']];
+    }
+
+    const reviews = await Review.findAndCountAll({
+      where: whereConditions,
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['user_id'],
+          include: [
+            {
+              model: UserProfile,
+              as: 'profile',
+              attributes: ['first_name', 'last_name']
+            }
+          ]
+        },
+        {
+          model: FoodPackage,
+          as: 'package',
+          attributes: ['package_id', 'package_name'],
+          required: false
+        },
+        {
+          model: Order,
+          as: 'order',
+          attributes: ['order_id', 'order_date'],
+          required: false
+        }
+      ],
+      order: orderClause,
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+
+    // İstatistikleri hesapla
+    const stats = await Review.findOne({
+      where: {
+        seller_id: seller.seller_id,
+        is_visible: true
+      },
+      attributes: [
+        [Review.sequelize.fn('COUNT', Review.sequelize.col('review_id')), 'total'],
+        [Review.sequelize.fn('AVG', Review.sequelize.col('rating')), 'average_rating'],
+        [
+          Review.sequelize.fn('COUNT', 
+            Review.sequelize.literal('CASE WHEN response_text IS NOT NULL THEN 1 END')
+          ), 
+          'responded'
+        ],
+        [
+          Review.sequelize.fn('COUNT', 
+            Review.sequelize.literal('CASE WHEN response_text IS NULL THEN 1 END')
+          ), 
+          'needs_response'
+        ]
+      ],
+      raw: true
+    });
+
+    // Yorumları formatla
+    const formattedReviews = reviews.rows.map(review => {
+      const customerName = review.is_anonymous 
+        ? 'Anonim Müşteri'
+        : (review.user?.profile?.first_name && review.user?.profile?.last_name)
+          ? `${review.user.profile.first_name} ${review.user.profile.last_name}`
+          : 'Müşteri';
+
+      return {
+        review_id: review.review_id,
+        customer_name: customerName,
+        product_name: review.package?.package_name || 'Ürün Bulunamadı',
+        // product_image: review.package?.image_url || '/default-food.jpg',
+        
+        // Rating bilgileri
+        rating: review.rating,
+        food_quality_rating: review.food_quality_rating,
+        service_rating: review.service_rating,
+        value_rating: review.value_rating,
+        
+        // Yorum detayları
+        comment: review.comment,
+        helpful_count: review.helpful_count,
+        is_anonymous: review.is_anonymous,
+        is_visible: review.is_visible,
+        created_at: review.created_at,
+        
+        // Satıcı yanıtı
+        response_text: review.response_text,
+        response_date: review.response_date,
+        
+        // Sipariş bilgisi
+        order_date: review.order?.order_date || null
+      };
+    });
+
+    return res.json({
+      success: true,
+      reviews: formattedReviews,
+      totalCount: reviews.count,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(reviews.count / parseInt(limit)),
+      stats: {
+        total: parseInt(stats?.total || 0),
+        averageRating: parseFloat(stats?.average_rating || 0).toFixed(1),
+        responded: parseInt(stats?.responded || 0),
+        needsResponse: parseInt(stats?.needs_response || 0)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Satıcı yorumları getirme hatası:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Yorumlar getirilemedi',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
 
   // Diğer methodlar aynı kalıyor...
   static async getSellerReviews(req, res) {

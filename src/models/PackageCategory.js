@@ -30,5 +30,11 @@ const PackageCategory = sequelize.define('PackageCategory', {
   tableName: 'package_categories',
   timestamps: false
 });
+PackageCategory.associate = function(models) {
+  PackageCategory.hasMany(models.FoodPackage, {
+    foreignKey: 'category_id',
+    as: 'packages'
+  });
+};
 
 module.exports = PackageCategory;

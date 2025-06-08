@@ -24,7 +24,7 @@ router.get('/active-with-categories', packageController.getActivePackagesWithCat
 router.get('/history', packageController.getPackageHistory);
 router.get('/my-packages', packageController.getMyPackages);
 router.get('/my-packages-with-categories', packageController.getMyPackagesWithCategories);
-
+router.get('/active-with-images', packageController.getAllActivePackagesForShopping);
 // ⭐ PARAMETRE İÇEREN ROUTE'LAR (en sonda)
 router.put('/:id', packageController.upload.none(), packageController.updatePackage);
 router.post('/:id/cancel', packageController.cancelPackage);

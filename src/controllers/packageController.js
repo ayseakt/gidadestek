@@ -7,7 +7,7 @@ const {
 const path = require('path');
 // Eğer Category modeli yoksa, models'dan dinamik olarak al
 const models = require('../models');
-const Category = models.Category || models.PackageCategory; // Her iki ismi de dene
+const Category = models.Category; // Her iki ismi de dene
 const fs = require('fs');
 const multer = require('multer');
 
@@ -838,6 +838,11 @@ const getAllActivePackagesForShopping = async (req, res) => {
           as: 'seller',
           required: false,
           attributes: ['seller_id', 'user_id', 'business_name']
+        },
+        {
+          model: PackageImage, // ⭐ BU EKLENDİ
+          as: 'images',
+          required: false
         }
       ],
       order: [['created_at', 'DESC']]
@@ -912,49 +917,133 @@ const getMyPackagesWithCategories = async (req, res) => {
   }
 };
 
-// Tüm aktif paketler kategori ile (alışveriş için gelişmiş)
 const getAllActivePackagesWithCategories = async (req, res) => {
   try {
+    console.log('🔍 getAllActivePackagesWithCategories fonksiyonu çağırıldı');
+    
     const userId = req.user?.id || req.user?.user_id;
     let userLocation = null;
     
     if (userId) {
-      const { Location } = require('../models');
-      const defaultLocation = await Location.findOne({
-        where: { 
-          user_id: userId, 
-          is_default: true 
+      try {
+        const { Location } = require('../models');
+        const defaultLocation = await Location.findOne({
+          where: { 
+            user_id: userId, 
+            is_default: true 
+          }
+        });
+        
+        if (defaultLocation && defaultLocation.latitude && defaultLocation.longitude) {
+          userLocation = {
+            lat: parseFloat(defaultLocation.latitude),
+            lng: parseFloat(defaultLocation.longitude)
+          };
         }
-      });
-      
-      if (defaultLocation && defaultLocation.latitude && defaultLocation.longitude) {
-        userLocation = {
-          lat: parseFloat(defaultLocation.latitude),
-          lng: parseFloat(defaultLocation.longitude)
-        };
+      } catch (locationError) {
+        console.warn('⚠️ Kullanıcı konumu alınamadı:', locationError.message);
       }
     }
+
+    // ⭐ Temel include listesi (PackageImage dahil)
+    const includesWithImages = [
+      {
+        model: Seller,
+        as: 'seller',
+        attributes: ['seller_id', 'user_id', 'business_name'],
+        required: false
+      },
+      {
+        model: PackageLocation, 
+        as: 'location',
+        required: false
+      },
+      {
+        model: PackageImage,
+        as: 'images',
+        required: false
+      }
+    ];
+
+    // ⭐ Category modelini güvenli şekilde ekle
+    try {
+      // Önce hangi category modelinin mevcut olduğunu kontrol et
+      if (models.Category) {
+        includesWithImages.push({
+          model: models.Category,
+          as: 'category',
+          required: false
+        });
+        console.log('✅ Category modeli include edildi');
+      } else if (models.PackageCategory) {
+        // Eğer PackageCategory modeli varsa ve FoodPackage ile ilişkisi tanımlıysa
+        includesWithImages.push({
+          model: models.PackageCategory,
+          as: 'packageCategory', // FoodPackage modelinde tanımlanmış alias'ı kullan
+          required: false
+        });
+        console.log('✅ PackageCategory modeli include edildi');
+      } else {
+        console.log('⚠️ Hiçbir Category modeli bulunamadı');
+      }
+    } catch (categoryError) {
+      console.warn('⚠️ Category eklenirken hata:', categoryError.message);
+      // Category hatası olsa bile devam et
+    }
+
+    console.log('📋 Include listesi hazırlandı:', includesWithImages.length, 'model');
 
     const packages = await FoodPackage.findAll({
       where: { 
         is_active: 1
       },
-      include: packageIncludesWithCategory,
+      include: includesWithImages,
       order: [['created_at', 'DESC']]
     });
     
-    console.log('Kategori ile tüm aktif paketler alındı:', packages.length);
+    console.log('📦 Ham paketler alındı:', packages.length);
+    
+    // ⭐ Dosya yollarını web URL'sine çevir
+    const packagesWithWebUrls = packages.map(pkg => {
+      const packageObj = pkg.toJSON();
+      
+      if (packageObj.images && packageObj.images.length > 0) {
+        console.log(`🖼️ Paket ${packageObj.package_id} için ${packageObj.images.length} resim işleniyor`);
+        
+        packageObj.images = packageObj.images.map(img => {
+          const webUrl = img.image_path 
+            ? `${req.protocol}://${req.get('host')}/${img.image_path.replace(/\\/g, '/')}`
+            : null;
+            
+          console.log('📸 Resim URL:', img.image_path, '->', webUrl);
+          
+          return {
+            ...img,
+            web_url: webUrl
+          };
+        });
+      }
+      
+      return packageObj;
+    });
+    
+    console.log('✅ Kategori ve resimlerle tüm aktif paketler hazırlandı:', packagesWithWebUrls.length);
+    
     res.status(200).json({ 
       success: true, 
-      data: packages,
+      data: packagesWithWebUrls,
       userLocation: userLocation 
     });
+    
   } catch (error) {
-    console.error('Kategori ile tüm aktif paketler alınırken hata:', error);
+    console.error('❌ getAllActivePackagesWithCategories hatası:', error);
+    console.error('❌ Hata stack:', error.stack);
+    
     res.status(500).json({ 
       success: false, 
       message: 'Sunucu hatası', 
-      error: error.message 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };

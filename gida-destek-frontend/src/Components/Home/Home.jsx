@@ -38,7 +38,7 @@ const Home = () => {
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   const [isInitializing, setIsInitializing] = useState(true);
-
+  const [imageErrors, setImageErrors] = useState({});
   const categories = [
     { name: 'Tümü', icon: '🏪' },
     { name: 'Restoran', icon: '🍽️' },
@@ -162,28 +162,38 @@ const Home = () => {
     });
   };
 
-  const loadRealPackages = async () => {
-    try {
-      setIsLoadingPackages(true);
-      const response = await packageService.getAllActivePackages();
-      if (response.data.success) {
-        console.log('📦 Paketler yüklendi:', response.data.data);
-        setRealPackages(response.data.data);
-        
-        const totalPackages = response.data.data.length;
-        setImpactStats({
-          savedFood: totalPackages * 2,
-          co2Reduced: totalPackages * 3,
-          userCount: Math.floor(totalPackages * 1.5),
-        });
-      }
-    } catch (error) {
-      console.error('❌ Paketler yüklenirken hata:', error);
-    } finally {
-      setIsLoadingPackages(false);
-    }
-  };
 
+const loadRealPackages = async () => {
+  try {
+    setIsLoadingPackages(true);
+    const response = await packageService.getAllActivePackagesWithImages();
+    
+    if (response.data.success) {
+      console.log('📦 Paketler yüklendi:', response.data.data);
+      console.log('🖼️ İlk paketin resimleri:', response.data.data[0]?.images);
+      
+      setRealPackages(response.data.data);
+      
+      const totalPackages = response.data.data.length;
+      setImpactStats({
+        savedFood: totalPackages * 2,
+        co2Reduced: totalPackages * 3,
+        userCount: Math.floor(totalPackages * 1.5),
+      });
+    }
+  } catch (error) {
+    console.error('❌ Paketler yüklenirken hata:', error);
+  } finally {
+    setIsLoadingPackages(false);
+  }
+};
+const handleImageError = (businessId, fallbackUrl) => {
+  console.warn(`❌ Resim yüklenemedi (ID: ${businessId}), fallback URL kullanılıyor`);
+  setImageErrors(prev => ({
+    ...prev,
+    [businessId]: fallbackUrl
+  }));
+};
   const loadCartCount = async () => {
     try {
       const response = await cartService.getCartCount();
@@ -698,18 +708,38 @@ const Home = () => {
       categoryName = categoryMap[packageData.category_id] || 'Diğer';
     }
 
-    let imageUrl = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop';
-    
-    const categoryImages = {
-      'Restoran': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
-      'Fırın & Pastane': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&h=200&fit=crop',
-      'Market': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
-      'Kafe': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop',
-      'Manav': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&h=200&fit=crop',
-      'Diğer': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop'
-    };
-    
-    imageUrl = categoryImages[categoryName] || imageUrl;
+// Paket resmi belirleme - önce veritabanından, yoksa varsayılan
+// Paket resmi belirleme
+let imageUrl = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop';
+
+// ⭐ Veritabanından gelen resmi kullan
+if (packageData.images && packageData.images.length > 0) {
+  // Önce primary resmi ara, yoksa ilkini al
+  const primaryImage = packageData.images.find(img => img.is_primary) || packageData.images[0];
+  
+  if (primaryImage.web_url) {
+    imageUrl = primaryImage.web_url; // Backend'den gelen hazır URL
+  } else if (primaryImage.image_path) {
+    // Fallback: Manuel URL oluştur
+    const cleanPath = primaryImage.image_path.replace(/\\/g, '/');
+    imageUrl = `${process.env.REACT_APP_API_URL}/${cleanPath}`;
+  }
+} else {
+  // Kategoriye göre varsayılan resim
+  const categoryImages = {
+    'Restoran': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
+    'Fırın & Pastane': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&h=200&fit=crop',
+    'Market': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
+    'Kafe': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop',
+    'Manav': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&h=200&fit=crop',
+    'Diğer': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop'
+  };
+  
+  imageUrl = categoryImages[categoryName] || imageUrl;
+}
+
+console.log('🖼️ Paket resmi:', imageUrl);
+console.log('📸 Paket resimleri:', packageData.images);
 
   return {
     id: packageId,
@@ -724,6 +754,7 @@ const Home = () => {
     time: timeDisplay,
     category: categoryName,
     image: imageUrl,
+    packageImages: packageData.package_images || [], // Tüm resimleri sakla
     savedCount: Math.floor(Math.random() * 50) + 1, // Bu gerçek veriye dönüştürülebilir
     location: { lat, lng },
     sellerId: packageData.seller?.user_id || packageData.seller_id,
@@ -1100,11 +1131,18 @@ if (!currentUserId) {
                           
                         >
                           <div className="product-image-container">
-                            <img 
-                              src={business.image} 
-                              alt={business.product} 
-                              className="product-image" 
-                            />
+                              <img 
+                                src={imageErrors[business.id] || business.image} 
+                                alt={business.product} 
+                                className="product-image"
+                                onError={() => {
+                                  const fallbackUrl = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop`;
+                                  handleImageError(business.id, fallbackUrl);
+                                }}
+                                onLoad={() => {
+                                  console.log('✅ Resim yüklendi:', business.storeName);
+                                }}
+                              />
                             {/* <div 
                               className="favorite-button" 
                               onClick={(e) => {
@@ -1150,7 +1188,7 @@ if (!currentUserId) {
                             
                             <button 
                               className={`reserve-button ${business.isOwnPackage ? 'own-package' : ''}`}
-                              onClick={() => addToCart(business)}
+                              onClick={() => handleAddToCart(business)}
                               disabled={business.isOwnPackage}
                             >
                               {business.isOwnPackage ? '🚫 Kendi Paketiniz' : '🛒 Ürünü Kurtar'}
@@ -1219,9 +1257,13 @@ if (!currentUserId) {
             <div className="product-detail-content">
               <div className="product-detail-image-container">
                 <img 
-                  src={selectedProduct.image} 
+                  src={imageErrors[selectedProduct.id] || selectedProduct.image} 
                   alt={selectedProduct.product} 
-                  className="product-detail-image" 
+                  className="product-detail-image"
+                  onError={() => {
+                    const fallbackUrl = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop`;
+                    handleImageError(selectedProduct.id, fallbackUrl);
+                  }}
                 />
                 <div 
                   className="detail-favorite-button" 

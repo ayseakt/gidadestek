@@ -150,44 +150,51 @@ module.exports = (sequelize, DataTypes) => {
     }
   });
 
-  FoodPackage.associate = function(models) {
-    // PackageLocation ile ilişkiler
-    FoodPackage.hasOne(models.PackageLocation, {
-      foreignKey: 'package_id',
-      as: 'location'
-    });
-    FoodPackage.hasOne(models.PackageLocation, {
-      foreignKey: 'package_id',
-      as: 'packageLocation'
-    });
-    
-    // Seller ile ilişki
-    FoodPackage.belongsTo(models.Seller, {
-      foreignKey: 'seller_id',
-      as: 'seller'
-    });
+// FoodPackage.js - associate fonksiyonu düzeltmesi
+FoodPackage.associate = function(models) {
+  // PackageLocation ile ilişkiler
+  FoodPackage.hasOne(models.PackageLocation, {
+    foreignKey: 'package_id',
+    as: 'location'
+  });
+  FoodPackage.hasOne(models.PackageLocation, {
+    foreignKey: 'package_id',
+    as: 'packageLocation'
+  });
+  
+  // Seller ile ilişki
+  FoodPackage.belongsTo(models.Seller, {
+    foreignKey: 'seller_id',
+    as: 'seller'
+  });
 
-    // Category ile ilişki
-    if (models.Category) {
-      FoodPackage.belongsTo(models.Category, {
-        foreignKey: 'category_id',
-        as: 'category'
-      });
-    }
-    
-    // PackageImage ile ilişki
-    FoodPackage.hasMany(models.PackageImage, {
-      foreignKey: 'package_id',
-      as: 'images',
-      onDelete: 'CASCADE'
+  // ⭐ PackageCategory ile ilişki (YENİ)
+  FoodPackage.belongsTo(models.PackageCategory, {
+    foreignKey: 'category_id',
+    as: 'packageCategory'
+  });
+
+  // Category ile ilişki (varsa)
+  if (models.Category) {
+    FoodPackage.belongsTo(models.Category, {
+      foreignKey: 'category_id',
+      as: 'category'
     });
-    
-    // Review ile ilişki - FoodPackage has many reviews
-    FoodPackage.hasMany(models.Review, {
-      foreignKey: 'package_id',
-      as: 'reviews'
-    });
-  };
+  }
+  
+  // PackageImage ile ilişki
+  FoodPackage.hasMany(models.PackageImage, {
+    foreignKey: 'package_id',
+    as: 'images',
+    onDelete: 'CASCADE'
+  });
+  
+  // Review ile ilişki
+  FoodPackage.hasMany(models.Review, {
+    foreignKey: 'package_id',
+    as: 'reviews'
+  });
+};
 
   return FoodPackage;
 };

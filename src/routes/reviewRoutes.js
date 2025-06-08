@@ -6,8 +6,11 @@ const ReviewController = require('../controllers/reviewController');
 // ✅ Yorum oluşturma (sadece teslim edilmiş siparişler için)
 router.post('/create', authMiddleware, ReviewController.createReview);
 
-// ✅ Satıcının aldığı yorumları getirme
+// ✅ Satıcının aldığı yorumları getirme (public)
 router.get('/seller/:sellerId', ReviewController.getSellerReviews);
+
+// ✅ Satıcının kendi aldığı yorumları getirme (private) - YENİ EKLENEN
+router.get('/seller-reviews', authMiddleware, ReviewController.getMySellerReviews);
 
 // ✅ Kullanıcının kendi yorumları
 router.get('/my-reviews', authMiddleware, ReviewController.getUserReviews);
@@ -27,7 +30,7 @@ router.get('/reviewable-orders', authMiddleware, ReviewController.getReviewableO
 // ✅ Yorum güncelleme
 router.put('/:reviewId', authMiddleware, ReviewController.updateReview);
 
-
-
+// ✅ Yorum silme
+router.delete('/:reviewId', authMiddleware, ReviewController.deleteReview);
 
 module.exports = router;

@@ -413,14 +413,15 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
                     <>
                       <li onClick={() => navigate('/profil')}>Profil</li>
                       <li onClick={() => navigate('/aldiklarim')}>Siparişlerim</li>
-                      
+                      <li onClick={() => navigate('/degerlerim')}>Yorumlarım</li>
                     </>
                   ) : (
                     <>
                       <li onClick={() => navigate('/seller-profile')}>Profil</li>
                       <li onClick={() => navigate('/paketlerim')}>Paketlerim</li>
                       <li onClick={() => navigate('/sofrani-paylas')}>Kazançlarım</li>
-                      <li onClick={() => navigate('/degerlerim')}>Yorumlarım</li>
+                      <li onClick={() => navigate('/degerlendirmeler')}>Yorumlarım</li>
+                      
                     </>
                   )}
                   <button
@@ -512,6 +513,7 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
                       <button 
                         className="checkout-btn"
                         onClick={() => {
+                          setCartMenuOpen(false);
                           navigate('/odeme');
                         }}
                       >
