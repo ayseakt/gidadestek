@@ -6,36 +6,71 @@ const FoodWasteSlider = ({ impactStats }) => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
 
-  const slides = [
-    {
-      id: 1,
-      image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
-      title: "Çöpe Atılan Taze Yiyecekler",
-      subtitle: "Her gün milyonlarca taze ürün çöpe gidiyor",
-      stat: "26 milyon ekmek/gün",
-      description: "Türkiye'de günlük israf edilen ekmek miktarı",
-      overlay: "rgba(244, 165, 54, 0.7)"
-    },
-    {
-      id: 2,
-      image: "https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
-      title: "İsraf vs Açlık Kontrası",
-      subtitle: "Bir tarafta israf, diğer tarafta açlık",
-      stat: "828 milyon insan aç",
-      description: "Dünyada 1/3 yemek israf edilirken açlık sürüyor",
-      overlay: "rgba(177, 101, 190, 0.7)"
-    },
-    {
-      id: 3,
-      image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
-      title: "Tarihi Geçmiş Ürünler",
-      subtitle: "Marketlerde biriken sağlıklı gıdalar",
-      stat: "40% indirim",
-      description: "Son kullanma tarihi yakın ürünler kurtarılmayı bekliyor",
-      overlay: "rgba(215, 53, 88, 0.7)"
-    }
-  ];
-
+const slides = [
+  {
+    id: 1,
+    image: "https://images.unsplash.com/photo-1586201375761-83865001e31c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+    title: "Çöpe Atılan Taze Yiyecekler",
+    subtitle: "Her gün milyonlarca taze ürün çöpe gidiyor",
+    stat: "26 milyon ekmek/gün",
+    description: "Türkiye'de günlük israf edilen ekmek miktarı",
+    overlay: "rgba(46, 125, 50, 0.7)"
+  },
+  {
+    id: 2,
+    image: "https://images.unsplash.com/photo-1559526324-593bc073d938?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80", // Aile mutfakta yemek israfı
+    title: "Evlerdeki Gıda İsrafı",
+    subtitle: "Aileler farkında olmadan ne kadar israf ediyor",
+    stat: "%43 ev israfı",
+    description: "Toplam gıda israfının neredeyse yarısı evlerde oluyor",
+    overlay: "rgba(56, 142, 60, 0.7)"
+  },
+  {
+    id: 3,
+    image: "https://images.unsplash.com/photo-1542838132-92c53300491e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+    title: "İsraf vs Açlık Kontrası",
+    subtitle: "Bir tarafta israf, diğer tarafta açlık",
+    stat: "828 milyon insan aç",
+    description: "Dünyada 1/3 yemek israf edilirken açlık sürüyor",
+    overlay: "rgba(67, 160, 71, 0.7)"
+  },
+  {
+    id: 4,
+    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80", // Market çalışanı ürünleri kontrol ediyor
+    title: "Marketlerdeki Kayıplar",
+    subtitle: "Satış noktalarında biriken sağlıklı gıdalar",
+    stat: "40% indirim",
+    description: "Son kullanma tarihi yakın ürünler kurtarılmayı bekliyor",
+    overlay: "rgba(76, 175, 80, 0.7)"
+  },
+  {
+    id: 5,
+    image: "https://images.unsplash.com/photo-1593113598332-cd288d649433?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80", // Restoran mutfağında atık yiyecekler
+    title: "Restoran İsrafı",
+    subtitle: "Yemek sektöründeki büyük kayıplar",
+    stat: "1.6 milyon ton",
+    description: "Türkiye'de restoranlardan yıllık israf miktarı",
+    overlay: "rgba(46, 125, 50, 0.7)"
+  },
+  {
+    id: 6,
+    image: "https://images.unsplash.com/photo-1628618345907-a2c5e64a8ca0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80", // Çiftçi tarlada bozuk ürünlerle
+    title: "Tarladaki Kayıplar",
+    subtitle: "Hasat öncesi ve sonrası israf",
+    stat: "%25 üretim kaybı",
+    description: "Ürünler tarladan sofraya gelirken kaybolup gidiyor",
+    overlay: "rgba(56, 142, 60, 0.7)"
+  },
+  {
+    id: 7,
+    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80", // Gönüllüler yemek dağıtırken
+    title: "Kurtarma Hareketi",
+    subtitle: "Birlikte israfı durdurabiliriz",
+    stat: "50k+ kullanıcı",
+    description: "Şimdiden binlerce kişi gıda kurtarma hareketinde",
+    overlay: "rgba(67, 160, 71, 0.7)"
+  }
+];
   useEffect(() => {
     if (!isPlaying || isHovered) return;
 
@@ -212,7 +247,7 @@ const FoodWasteSlider = ({ impactStats }) => {
           font-weight: 800;
           margin: 0 0 15px 0;
           text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-          background: linear-gradient(45deg, #FFD700, #FFA500);
+          background: linear-gradient(45deg, #2E7D32, #388E3C);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -261,7 +296,7 @@ const FoodWasteSlider = ({ impactStats }) => {
           border-radius: 50px;
           cursor: pointer;
           transition: all 0.3s ease;
-          box-shadow: 0 8px 15px rgba(76, 175, 80, 0.3);
+          box-shadow: 0 8px 15px rgba(46, 125, 50, 0.3);
         }
 
         .cta-button:hover {

@@ -63,7 +63,10 @@ export const CartProvider = ({ children }) => {
           storeId: item.package.seller_id,
           price: parseFloat(item.package.original_price),
           newPrice: parseFloat(item.unit_price),
-          image: item.package.image_url,
+          image: item.package.image_url
+            || (item.package.images && item.package.images[0]?.web_url)
+            || (item.package.images && item.package.images[0])
+            || "https://via.placeholder.com/80",
           quantity: item.quantity,
           description: item.package.description,
           location: item.package.location ? {

@@ -220,8 +220,8 @@ const WelcomeScreen = ({ onComplete }) => {
           alt="SofraPay Logo" 
           style={{ width: '100px', height: '100px', objectFit: 'contain' }}
         />
-        <h1>Lezzetli yemekler <span className="highlight">dakikalar içinde</span> kapınızda!</h1>
-        <p>En sevdiğiniz restoran ve marketlerin lezzetli ürünleri SofraPay ile çok yakınınızda.</p>
+        <h1>Gıda israfı tarih oluyor<span className="highlight">,sen tasarruf ediyorsun!</span> </h1>
+        <p>Restoran ve marketlerden artık yemekleri uygun fiyatlarla kurtarın. Hem çevreyi koruyun, hem de lezzetli yemeklere ulaşın.</p>
         
         <div className="welcome-buttons">
           <button 
@@ -238,13 +238,7 @@ const WelcomeScreen = ({ onComplete }) => {
           </button>
         </div>
         
-        <button 
-          className="tertiary-button"
-          onClick={handleGuestContinue}
-          disabled={loading}
-        >
-          {loading ? 'Lütfen bekleyin...' : 'Misafir Olarak Devam Et'}
-        </button>
+
       </div>
     </div>,
     
@@ -330,17 +324,7 @@ const WelcomeScreen = ({ onComplete }) => {
           <span>veya</span>
         </div>
         
-        <div className="social-buttons">
-          <button type="button" className="social-button google">
-            <i className="fab fa-google"></i>
-            Google ile devam et
-          </button>
-          
-          <button type="button" className="social-button facebook">
-            <i className="fab fa-facebook-f"></i>
-            Facebook ile devam et
-          </button>
-        </div>
+
       </form>
     </div>,
     
@@ -380,13 +364,16 @@ const WelcomeScreen = ({ onComplete }) => {
             placeholder="Şifreniz"
             required
           />
-          <button 
-            type="button" 
-            className="forgot-password" 
-            onClick={handleForgotPassword}
+          <a 
+            href="#" 
+            className="forgot-password-link" 
+            onClick={(e) => {
+              e.preventDefault();
+              handleForgotPassword();
+            }}
           >
             Şifremi Unuttum
-          </button>
+          </a>
         </div>
         
         <button 

@@ -7,16 +7,6 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Mobil Header */
-/* .mobile-header {
-  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
-  color: white;
-  padding: 16px 20px;
-  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.2);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-} */
 
 .header-content {
   display: flex;
@@ -193,27 +183,21 @@
   box-shadow: 0 4px 16px rgba(255, 107, 107, 0.4);
 }
 
-/* Product Cards Container */
-.product-cards-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
-  padding: 20px;
-}
 
 /* Product Card */
 .product-card {
   background: white;
   border-radius: 20px;
-  overflow: hidden;
+  overflow: hidden; /* Bu önemli - taşan içeriği gizler */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: 1px solid #f0f4f8;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  min-height: 320px; /* Minimum yükseklik */
+  min-height: 380px; /* Minimum yüksekliği artırdık */
+  display: flex;
+  flex-direction: column;
 }
-
 .product-card:hover {
   transform: translateY(-8px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
@@ -268,8 +252,28 @@
 /* Product Info */
 .product-info {
   padding: 24px;
+  flex: 1; /* Kalan alanı kaplar */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.product-image-container.aspect-ratio {
+  aspect-ratio: 16/9; /* Sabit oran */
+  height: auto; /* Otomatik yükseklik */
+}
+.product-image.error {
+  background: linear-gradient(135deg, #fed7d7 0%, #feb2b2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e53e3e;
+  font-size: 14px;
 }
 
+.product-image.error::after {
+  content: '📷';
+  font-size: 24px;
+}
 .store-name {
   font-size: 14px;
   color: #718096;
@@ -327,12 +331,6 @@
   color: #a0aec0;
   text-decoration: line-through;
   font-weight: 500;
-}
-
-.new-price {
-  font-size: 20px;
-  font-weight: 800;
-  color: #FF6B6B;
 }
 
 /* Reserve Button */
@@ -558,7 +556,7 @@
   border-color: #4CAF50;
 }
 
-* Product Cards Container */
+/* Product Cards Container */
 .product-cards-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -585,27 +583,63 @@
 .product-card:hover::before {
   opacity: 1;
 }
-.product-image-container {
-  position: relative;
+
+
+
+.product-image-bg {
   width: 100%;
-  height: 180px;
-  overflow: hidden;
-  background-color: #f0f0f0; /* Gri arka plan (isteğe göre) */
-  border-radius: 12px 12px 0 0;
+  height: 100%;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  transition: transform 0.3s ease;
 }
 
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (max-width: 768px) {
+  .product-image-container {
+    height: 180px; /* Mobilde biraz daha küçük */
+  }
+}
+
+@media (max-width: 480px) {
+  .product-image-container {
+    height: 160px; /* Çok küçük ekranlar için */
+  }
+}
+.product-image-container {
+  width: 100%;
+  height: 200px; /* veya istediğiniz yükseklik */
+  overflow: hidden;
+  border-radius: 12px; /* isteğe bağlı */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5; /* isteğe bağlı, arka plan */
+}
 .product-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  display: block;
 }
-
-
-.product-image:hover {
-  transform: scale(1.05); /* Hover efekti */
+.product-image-bg {
+  width: 100%;
+  aspect-ratio: 4/3; /* veya 16/9, istediğiniz oran */
+  height: auto;
+  background-size: cover;
+  background-position: center;
+  border-radius: 12px;
+  background-repeat: no-repeat;
+  background-color: #f5f5f5;
 }
-
 /* Badges */
 .food-saved-tag {
   position: absolute;
@@ -1171,20 +1205,9 @@
   object-fit: cover;
   object-position: center;
 }
-/* Eğer görsellerin kesilmesini istemiyorsanız */
-.product-image-full {
-  object-fit: contain; /* Tüm görseli gösterir, boşluk bırakabilir */
-  background-color: #f5f5f5; /* Boşluklar için arka plan */
-}
-@media (max-width: 768px) {
-  .product-image-container {
-    height: 180px;
-  }
-  
-  .product-detail-image-container {
-    height: 250px;
-  }
-}
+
+
+
 
 .detail-favorite-button {
   position: absolute;

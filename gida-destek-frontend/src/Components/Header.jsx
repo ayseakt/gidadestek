@@ -36,6 +36,7 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
   const [activeUserType, setActiveUserType] = useState('business');
   const [notificationCount, setNotificationCount] = useState(3);
   const { cartItems, cartCount, removeFromCart, clearCart } = useCart();
+   console.log("CART ITEMS:", cartItems);
   const [userProfile, setUserProfile] = useState({
     name: 'Ahmet Yılmaz',
     profileImage: null
@@ -60,7 +61,7 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
     'Künefe', 'Sütlaç', 'Muhallebi', 'Tiramisu', 'Cheesecake',
     'Meyve salatası', 'Dondurma', 'Pasta', 'Kurabiye', 'Kek'
   ];
-
+ 
   // Mevcut useEffect'ler burada kalıyor...
   useEffect(() => {
     const checkAuth = async () => {

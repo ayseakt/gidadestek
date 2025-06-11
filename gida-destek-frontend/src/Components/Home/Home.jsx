@@ -9,18 +9,17 @@ import packageService from '../../services/packageService';
 import cartService from '../../services/cartServices';
 import { useCart } from '../../contexts/cartContext';
 import HeroImpactSection from './HeroImpactSection';
-
+import BusinessProfile from './BusinessProfile';
 const Home = () => {
-  const { addToCart } = useCart();
+  const { addToCart, cart, setCart }  = useCart();
   const [sortOption, setSortOption] = useState('distance');
+  const [notifications, setNotifications] = useState([]);
   const [realPackages, setRealPackages] = useState([]);
   const [isLoadingPackages, setIsLoadingPackages] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Tümü');
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart] = useState([]);
-  const [cartCount, setCartCount] = useState(0);
   const [showCart, setShowCart] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [favorites, setFavorites] = useState([]);
@@ -31,7 +30,8 @@ const Home = () => {
     userCount: 0,
   });
   const [showOnboarding, setShowOnboarding] = useState(false);
-  
+  const [showBusinessProfile, setShowBusinessProfile] = useState(false);
+  const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -189,16 +189,22 @@ const loadRealPackages = async () => {
 };
 const handleImageError = (businessId, fallbackUrl) => {
   console.warn(`❌ Resim yüklenemedi (ID: ${businessId}), fallback URL kullanılıyor`);
+  
+  // Yüksek kaliteli fallback resmi
+  const highQualityFallback = fallbackUrl.includes('?') 
+    ? `${fallbackUrl}&w=400&h=300&fit=crop&auto=format`
+    : `${fallbackUrl}?w=400&h=300&fit=crop&auto=format`;
+    
   setImageErrors(prev => ({
     ...prev,
-    [businessId]: fallbackUrl
+    [businessId]: highQualityFallback
   }));
 };
   const loadCartCount = async () => {
     try {
       const response = await cartService.getCartCount();
       if (response.data.success) {
-        setCartCount(response.data.data.count);
+        
       }
     } catch (error) {
       console.error('❌ Sepet sayısı alınırken hata:', error);
@@ -215,92 +221,80 @@ const handleImageError = (businessId, fallbackUrl) => {
       console.error('❌ Sepet getirilirken hata:', error);
     }
   };
+const showNotification = (message, type = 'info') => {
+  const id = Date.now();
+  const notification = { id, message, type };
+  
+  setNotifications(prev => [...prev, notification]);
+  
+  // 3 saniye sonra otomatik kaldır
+  setTimeout(() => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, 3000);
+};
 
-  const handleAddToCart = async (business, quantity = 1) => {
-    console.log('=== HANDLE ADD TO CART DEBUG ===');
-    console.log('Business objesi:', business);
-    console.log('Business objesi keys:', Object.keys(business));
-    console.log('business.id:', business.id, 'Type:', typeof business.id);
-    console.log('business.realId:', business.realId, 'Type:', typeof business.realId);
-    console.log('business.packageId:', business.packageId, 'Type:', typeof business.packageId);
-    
-    if (business.isOwnPackage) {
-      alert('Kendi paketinizi sepete ekleyemezsiniz!');
+const handleAddToCart = async (business, quantity = 1) => {
+  if (business.isOwnPackage) {
+    alert('Kendi paketinizi sepete ekleyemezsiniz!');
+    return;
+  }
+
+  // Paket ID'sini bul
+  let packageId =
+    (typeof business.realId === 'number' && business.realId) ||
+    (typeof business.packageId === 'number' && business.packageId) ||
+    (typeof business.id === 'number' && business.id);
+
+  if (!packageId) {
+    // String ID parse
+    let stringId = business.realId || business.packageId || business.id;
+    if (typeof stringId === 'string' && stringId.startsWith('real_')) {
+      const parsed = parseInt(stringId.replace('real_', ''), 10);
+      if (!isNaN(parsed) && parsed > 0) packageId = parsed;
+    } else if (typeof stringId === 'string') {
+      const parsed = parseInt(stringId, 10);
+      if (!isNaN(parsed) && parsed > 0) packageId = parsed;
+    }
+    if (!packageId) {
+      alert('Paket ID\'si bulunamadı veya geçersiz');
       return;
     }
+  }
 
-    try {
-      let packageId;
-      
-      if (business.realId !== undefined && business.realId !== null && typeof business.realId === 'number') {
-        packageId = business.realId;
-        console.log('✅ realId kullanıldı:', packageId, 'Type:', typeof packageId);
-      } else if (business.packageId !== undefined && business.packageId !== null && typeof business.packageId === 'number') {
-        packageId = business.packageId;
-        console.log('✅ packageId kullanıldı:', packageId, 'Type:', typeof packageId);
-      } else if (business.id !== undefined && business.id !== null && typeof business.id === 'number') {
-        packageId = business.id;
-        console.log('✅ id kullanıldı:', packageId, 'Type:', typeof packageId);
-      } else {
-        console.warn('⚠️ Numeric ID bulunamadı, string parse deneniyor...');
-        
-        let stringId = business.realId || business.packageId || business.id;
-        console.log('String parse denenen değer:', stringId, 'Type:', typeof stringId);
-        
-        if (typeof stringId === 'string' && stringId.startsWith('real_')) {
-          const parsed = parseInt(stringId.replace('real_', ''), 10);
-          if (!isNaN(parsed) && parsed > 0) {
-            packageId = parsed;
-            console.log('✅ String parse başarılı:', packageId);
-          }
-        } else if (typeof stringId === 'string') {
-          const parsed = parseInt(stringId, 10);
-          if (!isNaN(parsed) && parsed > 0) {
-            packageId = parsed;
-            console.log('✅ Direct string parse başarılı:', packageId);
-          }
-        }
-        
-        if (!packageId) {
-          console.error('❌ Hiçbir geçerli ID bulunamadı!');
-          alert('Paket ID\'si bulunamadı veya geçersiz');
-          return;
-        }
-      }
+  // Görseli bul
+  let imageUrl =
+    business.image ||
+    (business.images && business.images[0]?.web_url) ||
+    (business.images && business.images[0]) ||
+    "https://via.placeholder.com/80";
+  console.log("Business images:", business.images);
+  // Sepete ekle (context fonksiyonu ile)
+  const result = await addToCart({
+    id: packageId,
+    product: business.product,
+    storeName: business.storeName,
+    storeId: business.storeId,
+    price: business.price,
+    newPrice: business.newPrice,
+    image: imageUrl,
+    quantity,
+  });
 
-      if (typeof packageId !== 'number' || isNaN(packageId) || packageId <= 0) {
-        console.error('❌ Final validation failed - Geçersiz packageId:', packageId, 'Type:', typeof packageId);
-        alert('Geçersiz paket ID');
-        return;
-      }
-
-      console.log('✅ FINAL packageId kullanılacak:', packageId, 'Type:', typeof packageId);
-      
-      const response = await cartService.addToCart(packageId, quantity);
-      
-      if (response.data.success) {
-        await loadCartCount();
-        setImpactStats(prev => ({
-          ...prev,
-          savedFood: prev.savedFood + 1,
-          co2Reduced: prev.co2Reduced + 2,
-        }));
-        
-        alert(`${business.storeName} işletmesinden "${business.product}" ürünü sepete eklendi!`);
-        if (showProductDetail) {
-          setShowProductDetail(false);
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ handleAddToCart hatası:', error);
-      if (error.response?.data?.message) {
-        alert(error.response.data.message);
-      } else {
-        alert('Sepete eklenirken bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
-      }
-    }
-  };
+  // Bildirim veya toast göstermek istersen:
+  if (result?.success) {
+    // Sepete eklendi bildirimi
+    // ör: toast.success(result.message);
+  } else if (result?.alreadyInCart) {
+    // Zaten sepette bildirimi
+    // ör: toast.info(result.message);
+  } else if (result?.needsAuth) {
+    // Giriş yap uyarısı
+    // ör: toast.error(result.message);
+  } else if (result?.message) {
+    // Diğer hata
+    // ör: toast.error(result.message);
+  }
+};
 
   const handleUpdateCartItem = async (cartItemId, quantity) => {
     try {
@@ -337,14 +331,16 @@ const handleImageError = (businessId, fallbackUrl) => {
       }
     }
   };
-
+  const openBusinessProfile = (product) => {
+    setSelectedBusiness(product);
+    setShowBusinessProfile(true);
+  };
   const handleClearCart = async () => {
     if (window.confirm('Sepeti tamamen temizlemek istediğinizden emin misiniz?')) {
       try {
         const response = await cartService.clearCart();
         if (response.data.success) {
-          setCart([]);
-          setCartCount(0);
+          
           alert('Sepet temizlendi');
         }
       } catch (error) {
@@ -712,27 +708,30 @@ const handleImageError = (businessId, fallbackUrl) => {
 // Paket resmi belirleme
 let imageUrl = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop';
 
-// ⭐ Veritabanından gelen resmi kullan
+// Veritabanından gelen resmi kullan
 if (packageData.images && packageData.images.length > 0) {
   // Önce primary resmi ara, yoksa ilkini al
   const primaryImage = packageData.images.find(img => img.is_primary) || packageData.images[0];
   
   if (primaryImage.web_url) {
-    imageUrl = primaryImage.web_url; // Backend'den gelen hazır URL
+    // Resim kalitesini artırmak için URL'ye parametreler ekle
+    imageUrl = primaryImage.web_url.includes('?') 
+      ? `${primaryImage.web_url}&w=400&h=300&fit=crop&auto=format`
+      : `${primaryImage.web_url}?w=400&h=300&fit=crop&auto=format`;
   } else if (primaryImage.image_path) {
     // Fallback: Manuel URL oluştur
     const cleanPath = primaryImage.image_path.replace(/\\/g, '/');
     imageUrl = `${process.env.REACT_APP_API_URL}/${cleanPath}`;
   }
 } else {
-  // Kategoriye göre varsayılan resim
+  // Kategoriye göre varsayılan resim - yüksek kaliteli
   const categoryImages = {
-    'Restoran': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop',
-    'Fırın & Pastane': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&h=200&fit=crop',
-    'Market': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=200&fit=crop',
-    'Kafe': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop',
-    'Manav': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&h=200&fit=crop',
-    'Diğer': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop'
+    'Restoran': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop&auto=format',
+    'Fırın & Pastane': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=300&fit=crop&auto=format',
+    'Market': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=300&fit=crop&auto=format',
+    'Kafe': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=300&fit=crop&auto=format',
+    'Manav': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=300&fit=crop&auto=format',
+    'Diğer': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop&auto=format'
   };
   
   imageUrl = categoryImages[categoryName] || imageUrl;
@@ -912,8 +911,6 @@ useEffect(() => {
         setShowOnboarding(true);
       }
 
-      // 3. Konum bilgisi her zaman alınacak
-// 3. Konum bilgisi her zaman alınacak
       try {
         const location = await getUserDefaultLocation();
         console.log('📍 Kullanıcı konumu:', location);
@@ -923,15 +920,6 @@ useEffect(() => {
         setUserLocation({ lat: 41.0082, lng: 28.9784 });
       }
 
-      // 4. Favoriler
-      const savedFavorites = localStorage.getItem('favorites');
-      if (savedFavorites) {
-        try {
-          setFavorites(JSON.parse(savedFavorites));
-        } catch (favError) {
-          console.error('⭐ Favoriler parse hatası:', favError);
-        }
-      }
 
       // 5. Paket ve sepet verilerini paralel yükle
     await loadCartCount();
@@ -989,6 +977,18 @@ if (!currentUserId) {
 }
   return (
     <>
+    {/* Notifications */}
+    {notifications.length > 0 && (
+      <div className="notifications-container">
+        {notifications.map(notification => (
+          <div key={notification.id} className={`notification ${notification.type}`}>
+            <div className="notification-message">
+              {notification.message}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
       {showOnboarding && (
         <div className="onboarding-overlay">
           <div className="onboarding-container">
@@ -1085,12 +1085,7 @@ if (!currentUserId) {
                       <FaMapMarkerAlt /> Konum alınıyor...
                     </div>
                   )}
-                  
-                  {/* {userLocation && (
-                    <div className="location-status">
-                      <FaMapMarkerAlt /> {MAX_DISTANCE_KM}km içindeki fırsatlar
-                    </div>
-                  )} */}
+
                 </div>
                 
                   <div className="categories-container">
@@ -1131,32 +1126,11 @@ if (!currentUserId) {
                           
                         >
                           <div className="product-image-container">
-                              <img 
-                                src={imageErrors[business.id] || business.image} 
-                                alt={business.product} 
-                                className="product-image"
-                                onError={() => {
-                                  const fallbackUrl = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300&h=200&fit=crop`;
-                                  handleImageError(business.id, fallbackUrl);
-                                }}
-                                onLoad={() => {
-                                  console.log('✅ Resim yüklendi:', business.storeName);
-                                }}
-                              />
-                            {/* <div 
-                              className="favorite-button" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFavorite(business.id);
-                              }}
-                            >
-                              {isFavorite(business.id) ? 
-                                <FaHeart className="favorited" /> : 
-                                <FaRegHeart />
-                              }
-                            </div> */}
-
-                            {business.isOwnPackage && (
+                            <div
+                                className="product-image-bg"
+                                style={{ backgroundImage: `url(${business.image})` }}
+                              ></div>
+                              {business.isOwnPackage && (
                               <div className="own-package-badge">
                                 Kendi Paketiniz
                               </div>
@@ -1188,7 +1162,10 @@ if (!currentUserId) {
                             
                             <button 
                               className={`reserve-button ${business.isOwnPackage ? 'own-package' : ''}`}
-                              onClick={() => handleAddToCart(business)}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await handleAddToCart(business, 1);
+                              }}
                               disabled={business.isOwnPackage}
                             >
                               {business.isOwnPackage ? '🚫 Kendi Paketiniz' : '🛒 Ürünü Kurtar'}
@@ -1224,29 +1201,6 @@ if (!currentUserId) {
         <span>{showMapView ? "📋 Listeyi Göster" : "🗺️ Haritayı Göster"}</span>
       </button>
 
-      {/* Konum İzni */}
-      {/* {showLocationPermission && (
-        <div className="location-permission-overlay">
-          <div className="permission-container">
-            <div className="permission-icon">
-              <FaMapMarkerAlt />
-            </div>
-            <div className="permission-content">
-              <h3>📍 Konumunuzu Paylaşın</h3>
-              <p>Yakınınızdaki en iyi fırsatları görebilmek için konumunuza erişmemize izin verin.</p>
-              <div className="permission-actions">
-                <button className="allow-button" onClick={allowLocationPermission}>
-                  ✅ İzin Ver
-                </button>
-                <button className="later-button" onClick={declineLocationPermission}>
-                  ⏰ Daha Sonra
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )} */}
-      {/* Product Detail Popup */}
       {showProductDetail && selectedProduct && (
         <div className="product-detail-overlay" onClick={closeProductDetail}>
           <div className="product-detail-popup" onClick={(e) => e.stopPropagation()}>
@@ -1279,8 +1233,11 @@ if (!currentUserId) {
               </div>
               
               <div className="product-detail-info">
-                <div className="detail-store-name">
-                  <FaStore /> {selectedProduct.storeName || selectedProduct.seller?.business_name || 'Mağaza'}
+                <div className="detail-store-name" onClick={() => openBusinessProfile(selectedProduct)}>
+                  <FaStore /> 
+                  <span className="clickable-business-name">
+                    {selectedProduct.storeName || selectedProduct.seller?.business_name || 'Mağaza'}
+                  </span>
                 </div>
                 <h2 className="detail-product-name">
                   {selectedProduct.product || selectedProduct.package_name}
@@ -1382,6 +1339,18 @@ if (!currentUserId) {
                 >
                   Ürünü Kurtar
                 </button> */}
+                  {showBusinessProfile && selectedBusiness && (
+                    <BusinessProfile
+                      business={selectedBusiness}
+                      isVisible={showBusinessProfile}
+                      onClose={() => {
+                        setShowBusinessProfile(false);
+                        setSelectedBusiness(null);
+                      }}
+                      onAddToCart={addToCart} // Eğer addToCart fonksiyonunuz varsa
+                      currentUserId={currentUserId} // Kullanıcı ID'si
+                    />
+                  )}
               </div>
             </div>
           </div>
