@@ -463,7 +463,7 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
                       <div key={index} className="cart-item">
                         <div className="cart-item-image">
                           <img 
-                            src={item.image || "https://via.placeholder.com/80"} 
+                            src={item.image || item.packageData?.image || "https://via.placeholder.com/80"} 
                             alt={item.product} 
                           />
                         </div>

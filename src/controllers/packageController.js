@@ -13,15 +13,13 @@ const multer = require('multer');
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = 'uploads/packages';
-    // Klasör yoksa oluştur
+    const uploadDir = path.join('uploads', 'packages');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    // Dosya adını unique yap
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, 'package-' + uniqueSuffix + path.extname(file.originalname));
   }
@@ -278,7 +276,35 @@ const getPackageById = async (req, res) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 };
-
+const processPackageImages = (packages, req) => {
+  return packages.map(pkg => {
+    const packageObj = pkg.toJSON();
+    
+    if (packageObj.images && packageObj.images.length > 0) {
+      console.log(`🖼️ Paket ${packageObj.package_id} için ${packageObj.images.length} resim işleniyor`);
+      
+      packageObj.images = packageObj.images.map(img => {
+        // Windows backslash'lerini düzelt ve doğru URL oluştur
+        const cleanPath = img.image_path ? img.image_path.replace(/\\/g, '/') : null;
+        const webUrl = cleanPath 
+          ? `${req.protocol}://${req.get('host')}/${cleanPath}`
+          : null;
+          
+        console.log('📸 Resim yolu düzeltme:', img.image_path, '->', cleanPath, '->', webUrl);
+        
+        return {
+          ...img,
+          image_path: cleanPath, // Düzeltilmiş yol
+          web_url: webUrl        // Web URL'si
+        };
+      });
+    } else {
+      console.log(`📦 Paket ${packageObj.package_id} için resim bulunamadı`);
+    }
+    
+    return packageObj;
+  });
+};
 const getActivePackages = async (req, res) => {
   try {
     const user_id = req.user?.user_id || req.user?.id;
@@ -311,13 +337,18 @@ const getActivePackages = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
-    console.log('Bulunan aktif paketler:', packages.length);
-    res.status(200).json({ success: true, data: packages });
+    // ⭐ Yardımcı fonksiyonu kullan
+    const packagesWithWebUrls = processPackageImages(packages, req);
+
+    console.log('Bulunan aktif paketler:', packagesWithWebUrls.length);
+    res.status(200).json({ success: true, data: packagesWithWebUrls });
+
   } catch (error) {
     console.error('Aktif paketler alınırken hata:', error);
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
   }
 };
+
 
 // ⭐ PACKAGE IMAGE FONKSİYONLARI
 const addPackageImage = async (req, res) => {
@@ -549,13 +580,27 @@ const getActivePackagesWithCategories = async (req, res) => {
       include: packageIncludesWithCategory,
       order: [['created_at', 'DESC']]
     });
-    
-    res.status(200).json({ success: true, data: packages });
+
+    // YOL DÜZELTME
+    const result = packages.map(pkg => {
+      const pkgObj = pkg.toJSON();
+      if (pkgObj.images && pkgObj.images.length > 0) {
+        pkgObj.images = pkgObj.images.map(img => ({
+          ...img,
+          image_path: img.image_path.replace(/\\\\/g, '/')
+        }));
+      }
+      return pkgObj;
+    });
+
+    res.status(200).json({ success: true, data: result });
+
   } catch (error) {
     console.error('Kategori ile aktif paketler alınırken hata:', error);
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
   }
 };
+
 const getPackageHistory = async (req, res) => {
   try {
     const user_id = req.user?.user_id || req.user?.id;
@@ -569,20 +614,35 @@ const getPackageHistory = async (req, res) => {
     }
 
     const packages = await FoodPackage.findAll({
-      where: { 
-        seller_id: seller.seller_id,
-        is_active: 0
-      },
-      include: [{
-        model: PackageLocation,
-        as: 'location',
-        required: false
-      }],
+      where: { seller_id: seller.seller_id, is_active: 0 },
+      include: [
+        { model: PackageLocation, as: 'location', required: false },
+        { model: PackageImage, as: 'images', required: false }
+      ],
       order: [['updated_at', 'DESC']]
     });
 
-    console.log('Geçmiş paketler (iptal edilenler):', packages.length);
-    res.status(200).json({ success: true, data: packages });
+    // YOL DÜZELTME + WEB_URL EKLEME
+    const result = packages.map(pkg => {
+      const pkgObj = pkg.toJSON();
+      if (pkgObj.images && pkgObj.images.length > 0) {
+        pkgObj.images = pkgObj.images.map(img => {
+          const cleanPath = img.image_path ? img.image_path.replace(/\\\\/g, '/') : null;
+          const webUrl = cleanPath
+            ? `${req.protocol}://${req.get('host')}/${cleanPath}`
+            : null;
+          return {
+            ...img,
+            image_path: cleanPath,
+            web_url: webUrl
+          };
+        });
+      }
+      return pkgObj;
+    });
+
+    res.status(200).json({ success: true, data: result });
+
   } catch (error) {
     console.error('Paket geçmişi alınırken hata:', error);
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: error.message });
@@ -591,7 +651,6 @@ const getPackageHistory = async (req, res) => {
 const getMyPackages = async (req, res) => {
   try {
     console.log('getMyPackages fonksiyonu çağırıldı');
-    console.log('req.user:', req.user);
     
     const user_id = req.user?.user_id || req.user?.id;
     
@@ -599,71 +658,83 @@ const getMyPackages = async (req, res) => {
       console.error('User ID bulunamadı:', req.user);
       return res.status(400).json({ 
         success: false, 
-        message: 'Kullanıcı bulunamadı - user_id eksik',
-        debug: { user: req.user }
+        message: 'Kullanıcı bulunamadı - user_id eksik'
       });
     }
-
-    console.log('User ID:', user_id);
 
     const seller = await Seller.findOne({ where: { user_id } });
     
     if (!seller) {
-      console.error('Seller bulunamadı için user_id:', user_id);
       return res.status(400).json({ 
         success: false, 
-        message: 'Satıcı kaydı bulunamadı!',
-        debug: { user_id, seller: null }
+        message: 'Satıcı kaydı bulunamadı!'
       });
     }
 
-    console.log('Seller bulundu:', seller.seller_id);
-
-    let packages;
-    try {
-      packages = await FoodPackage.findAll({
-        where: { 
-          seller_id: seller.seller_id,
-          is_active: 1
-        },
-        include: [{
+    // ⭐ PackageImage modelini include et ve resim URL'lerini oluştur
+    const packages = await FoodPackage.findAll({
+      where: { 
+        seller_id: seller.seller_id,
+        is_active: 1
+      },
+      include: [
+        {
           model: PackageLocation,
           as: 'location',
           required: false
-        }],
-        order: [['created_at', 'DESC']]
-      });
-      
-      console.log('Aktif paketler başarıyla alındı:', packages.length);
-    } catch (includeError) {
-      console.warn('Location include başarısız, temel paketler döndürülüyor:', includeError.message);
-      
-      packages = await FoodPackage.findAll({
-        where: { 
-          seller_id: seller.seller_id,
-          is_active: 1
         },
-        order: [['created_at', 'DESC']]
-      });
-    }
+        {
+          model: PackageImage, // ⭐ BU EKLENDİ
+          as: 'images',
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
 
-    console.log('Kullanıcının aktif paketleri:', packages.length);
+    // ⭐ Resim URL'lerini web formatına çevir - DÜZELTME
+    const packagesWithWebUrls = packages.map(pkg => {
+      const packageObj = pkg.toJSON();
+      
+      if (packageObj.images && packageObj.images.length > 0) {
+        console.log(`🖼️ Paket ${packageObj.package_id} için ${packageObj.images.length} resim işleniyor`);
+        
+        packageObj.images = packageObj.images.map(img => {
+          // ⭐ Windows backslash'lerini düzelt ve doğru URL oluştur
+          const cleanPath = img.image_path ? img.image_path.replace(/\\/g, '/') : null;
+          const webUrl = cleanPath 
+            ? `${req.protocol}://${req.get('host')}/${cleanPath}`
+            : null;
+            
+          console.log('📸 Resim yolu düzeltme:', img.image_path, '->', cleanPath, '->', webUrl);
+          
+          return {
+            ...img,
+            image_path: cleanPath, // Düzeltilmiş yol
+            web_url: webUrl        // Web URL'si
+          };
+        });
+      } else {
+        console.log(`📦 Paket ${packageObj.package_id} için resim bulunamadı`);
+      }
+      
+      return packageObj;
+    });
+
+    console.log('Kullanıcının aktif paketleri:', packagesWithWebUrls.length);
     
     return res.status(200).json({ 
       success: true, 
-      data: packages,
-      message: `${packages.length} aktif paket bulundu`
+      data: packagesWithWebUrls,
+      message: `${packagesWithWebUrls.length} aktif paket bulundu`
     });
     
   } catch (error) {
     console.error('getMyPackages hatası:', error);
-    console.error('Error stack:', error.stack);
-    
     return res.status(500).json({ 
       success: false, 
       message: 'Paketler alınırken hata oluştu', 
-      error: error.message,
-      debug: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     });
   }
 };
@@ -776,17 +847,36 @@ const updatePackage = async (req, res) => {
 
     console.log('Paket güncellendi:', id);
     
+    // ⭐ Güncellenmiş paketi resimlerle birlikte getir
     const updatedPackage = await FoodPackage.findByPk(id, {
-      include: [{
-        model: PackageLocation,
-        as: 'location',
-        required: false
-      }]
+      include: [
+        {
+          model: PackageLocation,
+          as: 'location',
+          required: false
+        },
+        {
+          model: PackageImage, // ⭐ BU EKLENDİ
+          as: 'images',
+          required: false
+        }
+      ]
     });
+
+    // ⭐ Resim URL'lerini web formatına çevir
+    const packageWithWebUrls = updatedPackage.toJSON();
+    if (packageWithWebUrls.images && packageWithWebUrls.images.length > 0) {
+      packageWithWebUrls.images = packageWithWebUrls.images.map(img => ({
+        ...img,
+        web_url: img.image_path 
+          ? `${req.protocol}://${req.get('host')}/${img.image_path.replace(/\\/g, '/')}`
+          : null
+      }));
+    }
 
     res.status(200).json({ 
       success: true, 
-      data: updatedPackage,
+      data: packageWithWebUrls,
       message: 'Paket başarıyla güncellendi' 
     });
 
@@ -799,7 +889,6 @@ const updatePackage = async (req, res) => {
     });
   }
 };
-
 const getAllActivePackagesForShopping = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?.user_id;
@@ -819,7 +908,6 @@ const getAllActivePackagesForShopping = async (req, res) => {
           lat: parseFloat(defaultLocation.latitude),
           lng: parseFloat(defaultLocation.longitude)
         };
-        console.log('Kullanıcının varsayılan adresi:', userLocation);
       }
     }
 
@@ -840,7 +928,7 @@ const getAllActivePackagesForShopping = async (req, res) => {
           attributes: ['seller_id', 'user_id', 'business_name']
         },
         {
-          model: PackageImage, // ⭐ BU EKLENDİ
+          model: PackageImage,
           as: 'images',
           required: false
         }
@@ -848,10 +936,27 @@ const getAllActivePackagesForShopping = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
     
-    console.log('Tüm aktif paketler alındı:', packages.length);
+    // ⭐ RESİM URL'LERİNİ DÜZELT
+    const packagesWithWebUrls = packages.map(pkg => {
+      const packageObj = pkg.toJSON();
+      
+      if (packageObj.images && packageObj.images.length > 0) {
+        packageObj.images = packageObj.images.map(img => ({
+          ...img,
+          image_path: img.image_path ? img.image_path.replace(/\\/g, '/') : null,
+          web_url: img.image_path 
+            ? `${req.protocol}://${req.get('host')}/${img.image_path.replace(/\\/g, '/')}`
+            : null
+        }));
+      }
+      
+      return packageObj;
+    });
+    
+    console.log('Tüm aktif paketler alındı:', packagesWithWebUrls.length);
     res.status(200).json({ 
       success: true, 
-      data: packages,
+      data: packagesWithWebUrls,
       userLocation: userLocation 
     });
   } catch (error) {
@@ -897,19 +1002,63 @@ const getMyPackagesWithCategories = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Satıcı kaydı bulunamadı!' });
     }
 
+    // ⭐ PackageImage'ı packageIncludesWithCategory'ye ekle
+    const includesWithImages = [
+      {
+        model: Seller,
+        as: 'seller',
+        attributes: ['seller_id', 'user_id', 'business_name']
+      },
+      {
+        model: PackageLocation, 
+        as: 'location',
+        required: false
+      },
+      {
+        model: PackageImage, // ⭐ BU EKLENDİ
+        as: 'images',
+        required: false
+      }
+    ];
+
+    // Category modeli varsa ekle
+    if (Category) {
+      includesWithImages.push({
+        model: Category,
+        as: 'category',
+        required: false
+      });
+    }
+
     const packages = await FoodPackage.findAll({
       where: { 
         seller_id: seller.seller_id,
         is_active: 1
       },
-      include: packageIncludesWithCategory,
+      include: includesWithImages,
       order: [['created_at', 'DESC']]
+    });
+
+    // ⭐ Resim URL'lerini web formatına çevir
+    const packagesWithWebUrls = packages.map(pkg => {
+      const packageObj = pkg.toJSON();
+      
+      if (packageObj.images && packageObj.images.length > 0) {
+        packageObj.images = packageObj.images.map(img => ({
+          ...img,
+          web_url: img.image_path 
+            ? `${req.protocol}://${req.get('host')}/${img.image_path.replace(/\\/g, '/')}`
+            : null
+        }));
+      }
+      
+      return packageObj;
     });
     
     res.status(200).json({ 
       success: true, 
-      data: packages,
-      message: `${packages.length} aktif paket bulundu`
+      data: packagesWithWebUrls,
+      message: `${packagesWithWebUrls.length} aktif paket bulundu`
     });
   } catch (error) {
     console.error('Kategori ile paketler alınırken hata:', error);
@@ -945,7 +1094,6 @@ const getAllActivePackagesWithCategories = async (req, res) => {
       }
     }
 
-    // ⭐ Temel include listesi (PackageImage dahil)
     const includesWithImages = [
       {
         model: Seller,
@@ -965,9 +1113,7 @@ const getAllActivePackagesWithCategories = async (req, res) => {
       }
     ];
 
-    // ⭐ Category modelini güvenli şekilde ekle
     try {
-      // Önce hangi category modelinin mevcut olduğunu kontrol et
       if (models.Category) {
         includesWithImages.push({
           model: models.Category,
@@ -976,22 +1122,16 @@ const getAllActivePackagesWithCategories = async (req, res) => {
         });
         console.log('✅ Category modeli include edildi');
       } else if (models.PackageCategory) {
-        // Eğer PackageCategory modeli varsa ve FoodPackage ile ilişkisi tanımlıysa
         includesWithImages.push({
           model: models.PackageCategory,
-          as: 'packageCategory', // FoodPackage modelinde tanımlanmış alias'ı kullan
+          as: 'packageCategory',
           required: false
         });
         console.log('✅ PackageCategory modeli include edildi');
-      } else {
-        console.log('⚠️ Hiçbir Category modeli bulunamadı');
       }
     } catch (categoryError) {
       console.warn('⚠️ Category eklenirken hata:', categoryError.message);
-      // Category hatası olsa bile devam et
     }
-
-    console.log('📋 Include listesi hazırlandı:', includesWithImages.length, 'model');
 
     const packages = await FoodPackage.findAll({
       where: { 
@@ -1003,7 +1143,7 @@ const getAllActivePackagesWithCategories = async (req, res) => {
     
     console.log('📦 Ham paketler alındı:', packages.length);
     
-    // ⭐ Dosya yollarını web URL'sine çevir
+    // ⭐ DOĞRU URL OLUŞTURMA
     const packagesWithWebUrls = packages.map(pkg => {
       const packageObj = pkg.toJSON();
       
@@ -1011,15 +1151,18 @@ const getAllActivePackagesWithCategories = async (req, res) => {
         console.log(`🖼️ Paket ${packageObj.package_id} için ${packageObj.images.length} resim işleniyor`);
         
         packageObj.images = packageObj.images.map(img => {
-          const webUrl = img.image_path 
-            ? `${req.protocol}://${req.get('host')}/${img.image_path.replace(/\\/g, '/')}`
+          // Windows backslash'lerini düzelt ve doğru URL oluştur
+          const cleanPath = img.image_path ? img.image_path.replace(/\\/g, '/') : null;
+          const webUrl = cleanPath 
+            ? `${req.protocol}://${req.get('host')}/${cleanPath}`
             : null;
             
-          console.log('📸 Resim URL:', img.image_path, '->', webUrl);
+          console.log('📸 Resim yolu düzeltme:', img.image_path, '->', cleanPath, '->', webUrl);
           
           return {
             ...img,
-            web_url: webUrl
+            image_path: cleanPath, // Düzeltilmiş yol
+            web_url: webUrl        // Web URL'si
           };
         });
       }
@@ -1037,13 +1180,11 @@ const getAllActivePackagesWithCategories = async (req, res) => {
     
   } catch (error) {
     console.error('❌ getAllActivePackagesWithCategories hatası:', error);
-    console.error('❌ Hata stack:', error.stack);
     
     res.status(500).json({ 
       success: false, 
       message: 'Sunucu hatası', 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     });
   }
 };
@@ -1063,5 +1204,6 @@ module.exports = {
   deletePackageImage,
   setPrimaryImage,
   getAllActivePackagesWithCategories,
-  upload: uploadConfig
+  upload: uploadConfig,
+  processPackageImages 
 };

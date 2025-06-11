@@ -261,24 +261,27 @@ const handleAddToCart = async (business, quantity = 1) => {
     }
   }
 
-  // Görseli bul
-  let imageUrl =
-    business.image ||
-    (business.images && business.images[0]?.web_url) ||
-    (business.images && business.images[0]) ||
-    "https://via.placeholder.com/80";
-  console.log("Business images:", business.images);
-  // Sepete ekle (context fonksiyonu ile)
-  const result = await addToCart({
-    id: packageId,
-    product: business.product,
-    storeName: business.storeName,
-    storeId: business.storeId,
-    price: business.price,
-    newPrice: business.newPrice,
-    image: imageUrl,
-    quantity,
-  });
+let imageUrl = "https://via.placeholder.com/80";
+if (business.images && business.images.length > 0) {
+  const primaryImage = business.images.find(img => img.is_primary) || business.images[0];
+  if (primaryImage.web_url) {
+    imageUrl = primaryImage.web_url;
+  }
+}
+console.log("Sepete eklenecek image:", imageUrl);
+console.log("business.images:", business.images);
+// Sepete ekle (context fonksiyonu ile)
+const result = await addToCart({
+  id: packageId,
+  product: business.product,
+  storeName: business.storeName,
+  storeId: business.storeId,
+  price: business.price,
+  newPrice: business.newPrice,
+  image: imageUrl,
+  quantity,
+});
+
 
   // Bildirim veya toast göstermek istersen:
   if (result?.success) {

@@ -57,6 +57,7 @@ app.use('/api/seller-locations', locationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ✅ Review route'ları - HEM TEKİL HEM ÇOĞUL
 app.use('/api/review', reviewRoutes);   // Mevcut
 app.use('/api/reviews', reviewRoutes);  // Frontend uyumluluğu için eklendi

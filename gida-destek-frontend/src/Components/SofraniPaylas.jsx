@@ -779,8 +779,26 @@ const handleImageError = (e, paket) => {
   if (!e.target.dataset.errorHandled) {
     e.target.dataset.errorHandled = 'true';
     
-    // Öncelikle data URL ile base64 placeholder dene
-    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPllFTUVLPC90ZXh0Pgo8L3N2Zz4K';
+    // Farklı fallback URL'leri dene
+    const fallbackUrls = [
+      // Yeni düzeltilmiş URL formatı
+      getImageUrl(paket).replace('http://localhost:3000uploads', 'http://localhost:3000/uploads'),
+      // Lokal asset
+      '/assets/placeholder-food.png',
+      // Base64 placeholder
+      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPllFTUVLPC90ZXh0Pgo8L3N2Zz4K'
+    ];
+    
+    // Mevcut URL'i fallback listesinden çıkar
+    const currentUrl = e.target.src;
+    const nextUrl = fallbackUrls.find(url => url !== currentUrl);
+    
+    if (nextUrl) {
+      console.log('🔄 Fallback URL deneniyor:', nextUrl);
+      e.target.src = nextUrl;
+    } else {
+      console.warn('⚠️ Tüm fallback URL\'ler denendi, varsayılan placeholder kullanılıyor');
+    }
   }
 };
 
@@ -792,7 +810,7 @@ const getImageUrl = (paket) => {
     // Paket nesnesinden resim yolunu al
     let imagePath = '';
     
-    // Tüm olası alan isimlerini kontrol et ve debug bilgisi ver
+    // Tüm olası alan isimlerini kontrol et
     const possibleImageFields = [
       'image_url', 'imageUrl', 'image_path', 'image', 
       'photo_url', 'picture_url', 'thumbnail'
@@ -830,21 +848,25 @@ const getImageUrl = (paket) => {
       return normalizedPath;
     }
     
+    // Backend URL'ini oluştur - API URL'den base URL'i çıkar
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5051/api';
+    const baseURL = apiUrl.replace('/api', ''); // /api kısmını çıkar
+    
+    // ✅ DÜZELTME: Slash kontrolü ve eklenmesi
     // Başında / yoksa ekle
     if (!normalizedPath.startsWith('/')) {
       normalizedPath = '/' + normalizedPath;
     }
     
-    // Backend URL'ini oluştur - API URL'den base URL'i çıkar
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5051/api';
-    const baseURL = apiUrl.replace('/api', ''); // /api kısmını çıkar
-    const fullImageUrl = `${baseURL}${normalizedPath}`;
+    // ✅ DÜZELTME: Base URL'de trailing slash kontrolü
+    const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+    const fullImageUrl = `${cleanBaseURL}${normalizedPath}`;
     
     console.log('🔗 API URL:', apiUrl);
-    console.log('🔗 Base URL:', baseURL);
+    console.log('🔗 Base URL:', cleanBaseURL);
+    console.log('🔗 Normalized Path:', normalizedPath);
     console.log('🔗 Oluşturulan tam resim URL:', fullImageUrl);
     
-    // URL'in erişilebilir olup olmadığını kontrol et (opsiyonel)
     return fullImageUrl;
     
   } catch (error) {
@@ -1268,25 +1290,25 @@ const getImageUrlAlternative = (paket) => {
                 ></textarea>
               </div>
               
-              <div className="form-group"> 
+              {/* FOTOĞRAF YÜKLEME ALANI */}
+              <div className="form-group">
                 <label>Fotoğraf Ekle</label>
                 <div className="photo-upload">
-                  <input  
-                    type="file" 
-                    id="photo-upload"                     // ✅ id eklendi
-                    name="images"
-                    onChange={handlePhotoUpload}
-                    multiple
-                    accept="image/*"
-                    style={{ display: 'none' }}           // ✅ gizli input (isteğe bağlı)
-                  />
-
+                  <div className="image-upload">
+                    <input  
+                      type="file" 
+                      id="photo-upload"
+                      name="images"
+                      onChange={handlePhotoUpload}
+                      multiple
+                      accept="image/*"
+                      className="hidden-input"
+                    />
+                  </div>
                   <label htmlFor="photo-upload" className="upload-button">
                     <FaCamera />
                     <span>Fotoğraf Yükle</span>
                   </label>
-
-                  {/* ✅ Güvenli erişim (undefined hatası vermez) */}
                   {formData.photos && formData.photos.length > 0 && (
                     <div className="photo-preview">
                       <span>{formData.photos.length} fotoğraf seçildi</span>
@@ -1294,6 +1316,7 @@ const getImageUrlAlternative = (paket) => {
                   )}
                 </div>
               </div>
+
 
               
               <div className="form-group">
@@ -1486,17 +1509,18 @@ const getImageUrlAlternative = (paket) => {
                     <img
                       src={
                         paket.images && paket.images.length > 0
-                          ? `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000'}${paket.images[0].image_url || paket.images[0].image_path}`
+                          ? (
+                              paket.images[0].web_url ||
+                              paket.images[0].image_url ||
+                              (paket.images[0].image_path
+                                ? (paket.images[0].image_path.startsWith('/')
+                                    ? (process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000') + paket.images[0].image_path
+                                    : (process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000') + '/' + paket.images[0].image_path)
+                                : '')
+                            )
                           : '/assets/placeholder-food.png'
                       }
-                      alt={paket.package_name || paket.baslik}
-                      style={{ 
-                        width: '100%', 
-                        height: '200px', 
-                        objectFit: 'cover', 
-                        borderRadius: '8px' 
-                      }}
-                      onError={(e) => {
+                      onError={e => {
                         console.error('Resim yüklenemedi:', e.target.src);
                         e.target.src = '/assets/placeholder-food.png';
                       }}
@@ -1551,7 +1575,33 @@ const getImageUrlAlternative = (paket) => {
               {gecmisPaketler.map((paket, index) => (
                 <div key={paket.package_id || index} className="paket-card cancelled">
                   <div className="paket-image">
-                    <img src={paket.fotograf || '/assets/placeholder-food.png'} alt={paket.package_name} />
+                    <img
+                      src={
+                        paket.images && paket.images.length > 0
+                          ? (
+                              paket.images[0].web_url ||
+                              paket.images[0].image_url ||
+                              (paket.images[0].image_path
+                                ? (
+                                    ((path => {
+                                      // Hem tek hem çift ters slash'ı düz slash'a çevir
+                                      const fixedPath = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
+                                      return (fixedPath.startsWith('/')
+                                        ? (process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000') + fixedPath
+                                        : (process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000') + '/' + fixedPath
+                                      );
+                                    })(paket.images[0].image_path))
+                                  )
+                                : '')
+                            )
+                          : '/assets/placeholder-food.png'
+                      }
+                      onError={e => {
+                        console.error('Resim yüklenemedi:', e.target.src);
+                        e.target.src = '/assets/placeholder-food.png';
+                      }}
+                    />
+
                     <div className="status-badge danger">İptal Edildi</div>
                   </div>
                   <div className="paket-details">
