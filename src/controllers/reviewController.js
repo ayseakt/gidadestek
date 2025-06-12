@@ -469,8 +469,17 @@ static async getMySellerReviews(req, res) {
         {
           model: FoodPackage,
           as: 'package',
-          attributes: ['package_id', 'package_name'],
-          required: false
+          attributes: ['package_id', 'package_name', 'discounted_price', 'category_id', 'description', 'original_price'],
+          required: false,
+          include: [
+            {
+              model: PackageImage,
+              as: 'images',
+              attributes: ['image_path', 'is_primary'],
+              where: { is_primary: true },
+              required: false
+            }
+          ]
         },
         {
           model: Order,
@@ -521,8 +530,12 @@ static async getMySellerReviews(req, res) {
         review_id: review.review_id,
         customer_name: customerName,
         product_name: review.package?.package_name || 'Ürün Bulunamadı',
-        // product_image: review.package?.image_url || '/default-food.jpg',
-        
+        product_image: review.package?.images?.[0]?.image_path || '/default-food.jpg',
+        package_id: review.package?.package_id || null,
+        discounted_price: review.package?.discounted_price || null,
+        category_id: review.package?.category_id || null,
+        description: review.package?.description || null,
+        original_price: review.package?.original_price || null,
         // Rating bilgileri
         rating: review.rating,
         food_quality_rating: review.food_quality_rating,
@@ -616,8 +629,17 @@ static async getMySellerReviews(req, res) {
           {
             model: FoodPackage,
             as: 'package',
-            attributes: ['package_id', 'package_name'],
-            required: false
+            attributes: ['package_id', 'package_name', 'discounted_price'],
+            required: false,
+            include: [
+              {
+                model: PackageImage,
+                as: 'images',
+                attributes: ['image_path', 'is_primary'],
+                where: { is_primary: true },
+                required: false
+              }
+            ]
           }
         ],
         order: orderClause,

@@ -15,6 +15,8 @@ import {
 } from 'react-icons/fa';
 import './SellerReview.css';
 
+const backendUrl = "http://localhost:5051";
+
 const SellerReviews = () => {
   const navigate = useNavigate();
   const [reviews, setReviews] = useState([]);
@@ -34,11 +36,11 @@ const SellerReviews = () => {
   });
 
   // Token alma fonksiyonu
-  const getAuthToken = useCallback(() => {
+  const getAuthToken = () => {
     const token = localStorage.getItem('token') || localStorage.getItem('authToken');
     console.log('🔑 Token kontrol:', { token: token ? 'Mevcut' : 'Yok', length: token?.length });
     return token;
-  }, []);
+  };
 
   // API base URL
   const API_BASE_URL = 'http://localhost:5051/api';
@@ -74,7 +76,7 @@ const SellerReviews = () => {
   });
 
   // İstatistikleri hesapla
-  const calculateStats = useCallback((reviewList) => {
+  const calculateStats = (reviewList) => {
     if (!Array.isArray(reviewList) || reviewList.length === 0) {
       return { total: 0, averageRating: 0, responded: 0, needsResponse: 0 };
     }
@@ -90,10 +92,10 @@ const SellerReviews = () => {
       responded,
       needsResponse
     };
-  }, []);
+  };
 
-  // ✅ ENHANCED - Yorumları getir fonksiyonu - FİX EDİLDİ
-  const fetchReviews = useCallback(async () => {
+  // Yorumları getir fonksiyonu - useCallback kaldırıldı
+  const fetchReviews = async () => {
     try {
       console.log('🚀 fetchReviews başlatıldı');
       setLoading(true);
@@ -147,15 +149,13 @@ const SellerReviews = () => {
       console.log('✅ API Response tam data:', data);
       setDebugInfo({ step: 'success', data: data });
       
-      // ✅ FİX: Data yapısını kontrol et ve reviews'i set et
       if (data.success && Array.isArray(data.reviews)) {
         console.log('✅ Reviews set ediliyor:', data.reviews.length, 'adet');
         console.log('✅ İlk review örneği:', data.reviews[0]);
         
-        // ✅ FİX: Reviews'i doğrudan set et
-        setReviews(data.reviews);
+        // Reviews'i doğrudan set et
+        setReviews([...data.reviews]); // Spread operator ile yeni array oluştur
         
-        // ✅ Stats'i güncelle
         if (data.stats) {
           setStats({
             total: Number(data.stats.total) || 0,
@@ -169,9 +169,6 @@ const SellerReviews = () => {
         
         console.log(`📊 ${data.reviews.length} yorum yüklendi`);
         
-        // ✅ DEBUG: Set edilen state'i kontrol et
-        console.log('✅ Reviews state set edildi, yeni reviews uzunluğu:', data.reviews.length);
-        
       } else {
         console.warn('⚠️ API response formatı beklenmeyen:', data);
         setReviews([]);
@@ -183,19 +180,18 @@ const SellerReviews = () => {
       console.error('❌ Fetch hatası:', error);
       setError(error.message);
       setDebugInfo({ step: 'catch_error', error: error.message, stack: error.stack });
-      // ✅ FİX: Hata durumunda da reviews'i boş array yap
       setReviews([]);
     } finally {
       console.log('🏁 Loading tamamlandı');
       setLoading(false);
     }
-  }, [getAuthToken, filter, sortBy, calculateStats]);
+  };
 
-  // ✅ Component mount edildiğinde yorumları yükle
+  // Component mount edildiğinde yorumları yükle
   useEffect(() => {
     console.log('🔄 useEffect tetiklendi - fetchReviews çağrılacak');
     fetchReviews();
-  }, [fetchReviews]);
+  }, [filter, sortBy]); // fetchReviews'i dependency'den çıkardık
 
   // Tarih formatlama
   const formatDate = useCallback((dateString) => {
@@ -216,9 +212,10 @@ const SellerReviews = () => {
     }
   }, []);
 
-  // Yıldız bileşeni
-  const StarRating = React.memo(({ rating, label, showLabel = true }) => {
+  // ⭐ FİX: Düzeltilmiş Yıldız bileşeni
+  const StarRating = React.memo(({ rating, label, showLabel = true, size = 'normal' }) => {
     const ratingValue = Number(rating) || 0;
+    const starClass = size === 'large' ? 'star-large' : 'star-normal';
     
     return (
       <div className="rating-row">
@@ -229,23 +226,26 @@ const SellerReviews = () => {
           {[1, 2, 3, 4, 5].map((star) => (
             <FaStar
               key={star}
-              className={star <= ratingValue ? 'star-filled' : 'star-empty'}
+              className={`${starClass} ${star <= ratingValue ? 'star-filled' : 'star-empty'}`}
+              style={{
+                color: star <= ratingValue ? '#ffc107' : '#e9ecef',
+                fontSize: size === 'large' ? '24px' : '16px'
+              }}
             />
           ))}
-          <span className="rating-value">({ratingValue}/5)</span>
+          <span className="rating-value" style={{ marginLeft: '8px', color: '#6c757d' }}>
+            ({ratingValue}/5)
+          </span>
         </div>
       </div>
     );
   });
 
-  // ✅ FİX: Filtreleme ve sıralama - Debug bilgisi ekle
+  // Filtreleme ve sıralama
   const filteredAndSortedReviews = useMemo(() => {
     console.log('🔍 filteredAndSortedReviews hesaplanıyor...');
     console.log('🔍 Reviews array:', reviews);
     console.log('🔍 Reviews length:', reviews?.length);
-    console.log('🔍 Is array?', Array.isArray(reviews));
-    console.log('🔍 Filter:', filter);
-    console.log('🔍 SortBy:', sortBy);
 
     if (!Array.isArray(reviews)) {
       console.warn('⚠️ Reviews array değil:', typeof reviews);
@@ -253,8 +253,6 @@ const SellerReviews = () => {
     }
 
     const filtered = reviews.filter(review => {
-      console.log('🔍 Filtering review:', review.review_id, review);
-      
       const reviewDate = new Date(review.created_at);
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const rating = Number(review.rating) || 0;
@@ -282,11 +280,8 @@ const SellerReviews = () => {
           shouldInclude = true;
       }
 
-      console.log('🔍 Review', review.review_id, 'should include:', shouldInclude);
       return shouldInclude;
     });
-
-    console.log('🔍 Filtered reviews count:', filtered.length);
 
     const sorted = filtered.sort((a, b) => {
       const dateA = new Date(a.created_at);
@@ -387,7 +382,7 @@ const SellerReviews = () => {
         return newSet;
       });
     }
-  }, [responseTexts, getAuthToken, respondingIds, showNotification]);
+  }, [responseTexts, respondingIds, showNotification]);
 
   // Yanıt metnini güncelle
   const updateResponseText = useCallback((reviewId, text) => {
@@ -403,24 +398,13 @@ const SellerReviews = () => {
     e.target.onerror = null;
   }, []);
 
-  // ✅ DEBUG: State'leri ekranda göster
-  console.log('🔍 Current State:');
-  console.log('🔍 - reviews:', reviews);
-  console.log('🔍 - reviews.length:', reviews?.length);
-  console.log('🔍 - filteredAndSortedReviews.length:', filteredAndSortedReviews?.length);
-  console.log('🔍 - loading:', loading);
-  console.log('🔍 - error:', error);
-  console.log('🔍 - filter:', filter);
-  console.log('🔍 - sortBy:', sortBy);
-
-  // ✅ ENHANCED Loading state - Debug bilgisi ile
+  // Loading state
   if (loading) {
     return (
       <div className="loading-spinner">
         <FaSpinner className="fa-spin" />
         <p>Müşteri yorumları yükleniyor...</p>
         
-        {/* ✅ Debug bilgisi göster */}
         {debugInfo && (
           <div style={{ marginTop: '20px', padding: '10px', background: '#f5f5f5', borderRadius: '8px', fontSize: '12px' }}>
             <h4>🔍 Debug Bilgisi:</h4>
@@ -428,7 +412,6 @@ const SellerReviews = () => {
           </div>
         )}
         
-        {/* ✅ Manuel yeniden deneme butonu */}
         <div style={{ marginTop: '20px' }}>
           <button 
             onClick={() => {
@@ -451,7 +434,6 @@ const SellerReviews = () => {
         <h2 className="error-title">❌ Hata Oluştu</h2>
         <p className="error-message">{error}</p>
         
-        {/* ✅ Debug bilgisi göster */}
         {debugInfo && (
           <div style={{ marginTop: '20px', padding: '10px', background: '#ffe6e6', borderRadius: '8px', fontSize: '12px' }}>
             <h4>🔍 Hata Detayları:</h4>
@@ -472,6 +454,8 @@ const SellerReviews = () => {
     );
   }
 
+  console.log('🔍 Render - filteredAndSortedReviews.length:', filteredAndSortedReviews.length);
+
   return (
     <>
       {notification && (
@@ -484,36 +468,10 @@ const SellerReviews = () => {
       <div className="seller-reviews-container">
         {/* Header */}
         <div className="header">
-          <button 
-            className="back-button"
-            onClick={() => navigate(-1)}
-          >
+          <button className="back-button" onClick={() => navigate(-1)}>
             <FaArrowLeft />
           </button>
-          <h1 className="page-title">
-            Müşteri Değerlendirmeleri
-          </h1>
-        </div>
-
-        {/* ✅ DEBUG Panel - State bilgilerini göster */}
-        <div style={{ margin: '20px 0', padding: '15px', background: '#e8f5e8', borderRadius: '8px', fontSize: '14px' }}>
-          <h4>🔍 Debug State Bilgisi:</h4>
-          <div>
-            <strong>Reviews Array Length:</strong> {reviews?.length || 0}<br/>
-            <strong>Filtered Reviews Length:</strong> {filteredAndSortedReviews?.length || 0}<br/>
-            <strong>Filter:</strong> {filter}<br/>
-            <strong>Sort By:</strong> {sortBy}<br/>
-            <strong>Loading:</strong> {loading ? 'true' : 'false'}<br/>
-            <strong>Error:</strong> {error || 'none'}<br/>
-          </div>
-          {debugInfo && (
-            <div>
-              <h5>Son API Durumu:</h5>
-              <pre style={{ fontSize: '12px', maxHeight: '200px', overflow: 'auto' }}>
-                {JSON.stringify(debugInfo, null, 2)}
-              </pre>
-            </div>
-          )}
+          <h1 className="page-title">Müşteri Değerlendirmeleri</h1>
         </div>
 
         {/* Stats Cards */}
@@ -601,15 +559,6 @@ const SellerReviews = () => {
 
         {/* Reviews List */}
         <div className="reviews-list">
-          {/* ✅ DEBUG: Liste render durumunu göster */}
-          <div style={{ padding: '10px', background: '#fff3cd', margin: '10px 0', borderRadius: '5px' }}>
-            <strong>🔍 Liste Render Durumu:</strong><br/>
-            Reviews array uzunluğu: {reviews?.length || 0}<br/>
-            Filtrelenmiş liste uzunluğu: {filteredAndSortedReviews?.length || 0}<br/>
-            Array mi: {Array.isArray(reviews) ? 'Evet' : 'Hayır'}<br/>
-            Filtered array mi: {Array.isArray(filteredAndSortedReviews) ? 'Evet' : 'Hayır'}
-          </div>
-
           {filteredAndSortedReviews.length === 0 ? (
             <div className="empty-state">
               <FaStar className="empty-icon" />
@@ -630,14 +579,6 @@ const SellerReviews = () => {
                   Tüm Yorumları Göster
                 </button>
               )}
-              
-              {/* ✅ DEBUG: Raw data göster */}
-              <div style={{ marginTop: '20px', padding: '10px', background: '#f8f9fa', borderRadius: '5px', fontSize: '12px' }}>
-                <strong>🔍 Raw Reviews Data:</strong>
-                <pre style={{ maxHeight: '300px', overflow: 'auto' }}>
-                  {JSON.stringify(reviews, null, 2)}
-                </pre>
-              </div>
             </div>
           ) : (
             filteredAndSortedReviews.map((review) => (
@@ -673,17 +614,42 @@ const SellerReviews = () => {
                 {/* Review Content */}
                 <div className="review-content">
                   {/* Product Image */}
-                  <div className="product-image-container">
-                    <img 
-                      src={review.product_image || '/default-food.jpg'} 
-                      alt={review.product_name || 'Ürün'} 
-                      className="product-image"
+                  <div className="review-product-image-container">
+                    <img
+                      className="review-product-image"
+                      src={
+                        review.product_image
+                          ? (review.product_image.startsWith('http')
+                              ? review.product_image
+                              : `${backendUrl}/${review.product_image.replace(/\\\\/g, "/").replace(/\\/g, "/")}`)
+                          : '/default-food.jpg'
+                      }
+                      alt={review.product_name || 'Ürün'}
                       onError={handleImageError}
                     />
                   </div>
 
                   {/* Review Details */}
                   <div className="review-details">
+                    {/* Product Details */}
+                    <div className="product-details">
+                      <div className="product-name">{review.product_name}</div>
+                      {review.discounted_price && (
+                        <div className="product-price">{review.discounted_price} TL</div>
+                      )}
+                      {review.original_price && (
+                        <div className="product-original-price">
+                          <s>{review.original_price} TL</s>
+                        </div>
+                      )}
+                      {review.category_id && (
+                        <div className="product-category">Kategori: {review.category_id}</div>
+                      )}
+                      {review.description && (
+                        <div className="product-description">{review.description}</div>
+                      )}
+                    </div>
+
                     {/* Overall Rating */}
                     <div className="overall-rating">
                       <div className="rating-display">
@@ -691,7 +657,11 @@ const SellerReviews = () => {
                           {[1, 2, 3, 4, 5].map((star) => (
                             <FaStar
                               key={star}
-                              className={star <= (Number(review.rating) || 0) ? 'star-filled-large' : 'star-empty-large'}
+                              style={{
+                                color: star <= (Number(review.rating) || 0) ? '#ffc107' : '#e9ecef',
+                                fontSize: '24px',
+                                marginRight: '4px'
+                              }}
                             />
                           ))}
                         </div>
@@ -732,7 +702,7 @@ const SellerReviews = () => {
                     {/* Review Meta */}
                     <div className="review-meta">
                       <div className="review-date">
-                        <FaCalendarAlt />
+                        <FaCalendarAlt style={{ marginRight: '8px' }} />
                         <span>{formatDate(review.created_at)}</span>
                       </div>
                       
@@ -749,7 +719,7 @@ const SellerReviews = () => {
                     {review.response_text && review.response_text.trim() && (
                       <div className="existing-response">
                         <div className="response-header">
-                          <FaReply />
+                          <FaReply style={{ marginRight: '8px' }} />
                           <span>Sizin Yanıtınız:</span>
                           {review.response_date && (
                             <span className="response-date">
@@ -765,7 +735,8 @@ const SellerReviews = () => {
                     {(!review.response_text || !review.response_text.trim()) && (
                       <div className="response-form">
                         <h4 className="response-form-title">
-                          <FaReply /> Bu değerlendirmeye yanıt verin
+                          <FaReply style={{ marginRight: '8px' }} /> 
+                          Bu değerlendirmeye yanıt verin
                         </h4>
                         <textarea
                           className="response-textarea"
@@ -782,12 +753,12 @@ const SellerReviews = () => {
                           >
                             {respondingIds.has(review.review_id) ? (
                               <>
-                                <FaSpinner className="fa-spin" />
+                                <FaSpinner className="fa-spin" style={{ marginRight: '8px' }} />
                                 Gönderiliyor...
                               </>
                             ) : (
                               <>
-                                <FaReply />
+                                <FaReply style={{ marginRight: '8px' }} />
                                 Yanıtı Gönder
                               </>
                             )}
