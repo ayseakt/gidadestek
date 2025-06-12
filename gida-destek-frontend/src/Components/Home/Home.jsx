@@ -10,7 +10,10 @@ import cartService from '../../services/cartServices';
 import { useCart } from '../../contexts/cartContext';
 import HeroImpactSection from './HeroImpactSection';
 import BusinessProfile from './BusinessProfile';
+import reviewService from '../../services/reviewService';
+import Header from '../Header'; 
 const Home = () => {
+  const [sellerRatings, setSellerRatings] = useState({});
   const { addToCart, cart, setCart }  = useCart();
   const [sortOption, setSortOption] = useState('distance');
   const [notifications, setNotifications] = useState([]);
@@ -48,7 +51,22 @@ const Home = () => {
     { name: 'Manav', icon: '🥬' },
     { name: 'Diğer', icon: '📦' }
   ];
-
+const loadSellerRatings = async (packages) => {
+  const ratings = {};
+  const uniqueSellerIds = [...new Set(packages.map(pkg => pkg.seller?.user_id || pkg.seller_id))];
+  await Promise.all(uniqueSellerIds.map(async (sellerId) => {
+    if (!sellerId) return;
+    try {
+      const res = await reviewService.getSellerAverageRating(sellerId);
+      if (res.data.success) {
+        ratings[sellerId] = res.data.averageRating;
+      }
+    } catch (e) {
+      ratings[sellerId] = null;
+    }
+  }));
+  setSellerRatings(ratings);
+};
   // Tarih formatlaması yardımcı fonksiyonları
   const formatTime = (timeString) => {
     if (!timeString) return 'Belirtilmemiş';
@@ -126,6 +144,8 @@ const Home = () => {
     }
   };
 
+
+
   const getUserCurrentLocation = () => {
     return new Promise((resolve, reject) => {
       if (navigator.geolocation) {
@@ -173,7 +193,7 @@ const loadRealPackages = async () => {
       console.log('🖼️ İlk paketin resimleri:', response.data.data[0]?.images);
       
       setRealPackages(response.data.data);
-      
+      await loadSellerRatings(response.data.data);
       const totalPackages = response.data.data.length;
       setImpactStats({
         savedFood: totalPackages * 2,
@@ -980,6 +1000,7 @@ if (!currentUserId) {
 }
   return (
     <>
+     <Header onSearch={setSearchQuery} />
     {/* Notifications */}
     {notifications.length > 0 && (
       <div className="notifications-container">
@@ -1044,6 +1065,7 @@ if (!currentUserId) {
       )}
 
       {/* Ana Uygulama */}
+     
       <div className="app-container">
         {/* Mobil Header */}
         <div className="mobile-header">
@@ -1306,7 +1328,7 @@ if (!currentUserId) {
                   }</p>
                 </div>
                 
-                {/* <div className="detail-ratings">
+                 <div className="detail-ratings">
                   <div className="detail-rating">
                     <span className="rating-star">★★★★★</span> 4.8/5.0
                   </div>
@@ -1322,7 +1344,7 @@ if (!currentUserId) {
                     <li><FaPizzaSlice /> Lezzetli yemekler</li>
                     <li><FaBolt /> Hızlı teslim</li>
                   </ul>
-                </div> */}
+                </div> 
                 <button 
                   className="detail-directions-button" 
                   onClick={() => {

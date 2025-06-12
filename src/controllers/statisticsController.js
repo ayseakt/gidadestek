@@ -1,8 +1,8 @@
-const { sequelize } = require('../config/db');
+
 const { Op } = require('sequelize');
 // ✅ DÜZELTME: Models/index.js'den import et
 const { FoodPackage, Order, OrderItem, Seller, User } = require('../models');
-
+const { sequelize } = require('../models');
 // Genel istatistikleri getirme
 const getGeneralStatistics = async (req, res) => {
   try {
@@ -488,11 +488,64 @@ const getChartData = async (req, res) => {
     });
   }
 };
+// Genel istatistikler
+const getStatistics = async (req, res) => {
+  try {
+    const [data] = await sequelize.query('SELECT * FROM statistics_view');
+    res.json(data[0]);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'İstatistikler alınamadı', error: err.message });
+  }
+};
 
-// Export işlemleri
+// Haftalık satışlar
+const getWeeklySales = async (req, res) => {
+  try {
+    const [data] = await sequelize.query('SELECT * FROM weekly_sales_view');
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Haftalık satışlar alınamadı', error: err.message });
+  }
+};
+
+// Kategori dağılımı
+const getCategoryDistribution = async (req, res) => {
+  try {
+    const [data] = await sequelize.query('SELECT * FROM category_distribution_view');
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Kategori dağılımı alınamadı', error: err.message });
+  }
+};
+
+// Aylık trend
+const getMonthlyTrend = async (req, res) => {
+  try {
+    const [data] = await sequelize.query('SELECT * FROM monthly_trend_view');
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Aylık trend alınamadı', error: err.message });
+  }
+};
+
+// Saatlik dağılım
+const getHourlyDistribution = async (req, res) => {
+  try {
+    const [data] = await sequelize.query('SELECT * FROM hourly_distribution_view');
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Saatlik dağılım alınamadı', error: err.message });
+  }
+};
+
 module.exports = {
   getGeneralStatistics,
   getPeriodStatistics,
   getChartData,
-  getDetailedStatistics 
+  getDetailedStatistics,
+  getStatistics,
+  getWeeklySales,
+  getCategoryDistribution,
+  getMonthlyTrend,
+  getHourlyDistribution
 };

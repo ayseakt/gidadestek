@@ -330,12 +330,20 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
               </div>
               <input
                 type="text"
+                className="search-input"
                 placeholder="Yiyecek ara... (pizza, döner, baklava...)"
                 value={searchTerm}
-                onChange={handleSearchChange}
-                onKeyPress={handleSearchKeyPress}
-                className="search-input"
+                onChange={e => {
+                  setSearchTerm(e.target.value);
+                  if (onSearch) onSearch(e.target.value); // Her değişiklikte Home'a ilet
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && onSearch) {
+                    onSearch(searchTerm);
+                  }
+                }}
               />
+
               {searchTerm && (
                 <button 
                   className="clear-search-btn"

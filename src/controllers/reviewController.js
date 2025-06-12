@@ -11,9 +11,65 @@ const {
 const { Op } = require('sequelize');
 const { PackageImage } = require('../models');
 class ReviewController {
-  // ✅ Yorum oluşturma (düzeltilmiş - doğru seller_id kullanımı)
-// ReviewController.js - createReview metodunu bu şekilde güncelleyin:
+ 
+// Satıcıya ait ortalama ratingi döndürür
+static async getSellerAverageRating(req, res) {
+  try {
+    const { seller_id } = req.params;
+    if (!seller_id) {
+      return res.status(400).json({ success: false, message: 'seller_id zorunlu' });
+    }
 
+    // Sadece ilgili satıcının review'larını çek
+    const reviews = await Review.findAll({
+      where: { seller_id: seller_id }
+    });
+
+    if (!reviews.length) {
+      return res.json({ success: true, averageRating: null, reviewCount: 0 });
+    }
+
+    // Ortalama rating hesapla
+    const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+    const avg = total / reviews.length;
+
+    return res.json({ success: true, averageRating: avg, reviewCount: reviews.length });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Sunucu hatası' });
+  }
+}
+// Satıcıya ait ortalama ratingi döndürür
+static async getSellerAverageRating(req, res) {
+  try {
+    const { seller_id } = req.params;
+    if (!seller_id) {
+      return res.status(400).json({ success: false, message: 'seller_id zorunlu' });
+    }
+
+    // Satıcıya ait tüm review'ları bul
+    const reviews = await Review.findAll({
+      include: [{
+        model: FoodPackage,
+        as: 'food_package',
+        where: { seller_id: seller_id }
+      }]
+    });
+
+    if (!reviews.length) {
+      return res.json({ success: true, averageRating: null, reviewCount: 0 });
+    }
+
+    // Ortalama rating hesapla
+    const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+    const avg = total / reviews.length;
+
+    return res.json({ success: true, averageRating: avg, reviewCount: reviews.length });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Sunucu hatası' });
+  }
+}
 static async createReview(req, res) {
   try {
     const userId = req.user.user_id || req.user.id;

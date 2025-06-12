@@ -1,26 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/authMiddleware');
-const statisticsController = require('../controllers/statisticsController');
-console.log('statisticsController:', statisticsController);
-
-// ✅ DÜZELTME: authMiddleware direkt fonksiyon export ediyor
 const authenticateToken = require('../middleware/authMiddleware');
+const statisticsController = require('../controllers/statisticsController');
 
-// Debug: middleware tipini kontrol et
-console.log('authenticateToken type:', typeof authenticateToken);
-
-// ✅ DÜZELTME: Route yolları prefix olmadan
-// /api/statistics zaten server.js'de tanımlı
+// Satıcıya özel istatistikler (giriş gerektirir)
 router.get('/general', authenticateToken, statisticsController.getGeneralStatistics);
 router.get('/period/:period', authenticateToken, statisticsController.getPeriodStatistics);
 router.get('/charts/:type', authenticateToken, statisticsController.getChartData);
 router.get('/detailed/:sellerId', authenticateToken, statisticsController.getDetailedStatistics);
-
-// ✅ YENİ: Frontend'in beklediği route
 router.get('/my-stats', authenticateToken, statisticsController.getGeneralStatistics);
 
-// Test route - middleware olmadan
+// SİSTEM GENELİ (herkese açık)
+router.get('/', statisticsController.getStatistics);
+router.get('/weekly-sales', statisticsController.getWeeklySales);
+router.get('/category-distribution', statisticsController.getCategoryDistribution);
+router.get('/monthly-trend', statisticsController.getMonthlyTrend);
+router.get('/hourly-distribution', statisticsController.getHourlyDistribution);
+
+// Test route
 router.get('/test', (req, res) => {
   res.json({
     success: true,
