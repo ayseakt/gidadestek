@@ -8,7 +8,6 @@ import locationService from '../services/locationService';
 import orderService from '../services/orderService'; 
 import StatisticsDashboard from './Statistics'; 
 function SofraniPaylas() {
-  // Düzenleme state'i eklendi
   const [editingPackage, setEditingPackage] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [siparisler, setSiparisler] = useState([]);
@@ -16,7 +15,6 @@ function SofraniPaylas() {
   const [showOrderDetail, setShowOrderDetail] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  // Düzeltilmiş state tanımlamaları
   const [locations, setLocations] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
   const [locationData, setLocationData] = useState({
@@ -28,16 +26,12 @@ function SofraniPaylas() {
   const [availableFrom, setAvailableFrom] = useState('');
   const [availableUntil, setAvailableUntil] = useState('');
   const [showLocationPopup, setShowLocationPopup] = useState(false);
-  
-  // Refs
   const searchInputRef = useRef(null);
   const mapRef = useRef(null);
   const searchBoxRef = useRef(null);
   const markerRef = useRef(null);
   const googleMapsLoadedRef = useRef(false);
   const navigate = useNavigate();
-  
-  // Diğer state'ler
   const [activeTab, setActiveTab] = useState('istatistikler');
   const [paketlerim, setPaketlerim] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -50,8 +44,6 @@ function SofraniPaylas() {
     kazanilanTutar: 0,
     azaltilanCO2: 0
   });
-
-  // Düzeltilmiş formData
   const [formData, setFormData] = useState({
     package_name: '',
     original_price: '',
@@ -64,22 +56,18 @@ function SofraniPaylas() {
     imageFile: null,
     images: []
   });
-
   // Google Maps API yükleme fonksiyonu
   const loadGoogleMapsAPI = useCallback(() => {
     return new Promise((resolve, reject) => {
       if (window.google && window.google.maps && googleMapsLoadedRef.current) {
         return resolve(window.google.maps);
       }
-      
       const apiKey = 'AIzaSyDiTgTw4XKZYsx51Uap4dYseatMij9d0I8';
-      
       if (!apiKey || apiKey === 'YOUR_API_KEY') {
         console.error('Geçersiz Google Maps API key');
         reject(new Error('Google Maps API key geçersiz'));
         return;
       }
-      
       const existingScript = document.querySelector('script[src*="googleapis.com/maps"]');
       if (existingScript) {
         existingScript.addEventListener('load', () => {
@@ -106,37 +94,30 @@ function SofraniPaylas() {
       document.body.appendChild(script);
     });
   }, []);
-
-  // Harita başlatma fonksiyonu
   const initializeMap = useCallback(() => {
     console.log('initializeMap çağrıldı');
-    
     if (!window.google || !window.google.maps) {
       console.error('Google Maps API yüklenmemiş');
       setError('Google Maps API yüklenmemiş. Sayfa yenilemeyi deneyin.');
       return;
     }
-
     const mapElement = document.getElementById('google-map');
     if (!mapElement) {
       console.error('Harita elementi bulunamadı');
       setError('Harita elementi bulunamadı.');
       return;
     }
-
     const rect = mapElement.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) {
       console.error('Harita elementi görünür değil:', rect);
       setError('Harita elementi görünür değil.');
       return;
     }
-
     try {
       const defaultCenter = { lat: 41.0082, lng: 28.9784 };
       const center = locationData.latitude && locationData.longitude 
         ? { lat: locationData.latitude, lng: locationData.longitude }
         : defaultCenter;
-
       const map = new window.google.maps.Map(mapElement, {
         center: center,
         zoom: 13,
@@ -145,7 +126,6 @@ function SofraniPaylas() {
         fullscreenControl: true,
       });
       mapRef.current = map;
-
       const marker = new window.google.maps.Marker({
         position: center,
         map,
@@ -153,16 +133,13 @@ function SofraniPaylas() {
         title: 'Teslimat Konumu'
       });
       markerRef.current = marker;
-
       setTimeout(() => {
         window.google.maps.event.trigger(map, 'resize');
         map.setCenter(center);
       }, 100);
-
       marker.addListener('dragend', (e) => {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
-        
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
           if (status === 'OK' && results[0]) {
@@ -175,12 +152,10 @@ function SofraniPaylas() {
           }
         });
       });
-
       map.addListener('click', (e) => {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
         marker.setPosition(e.latLng);
-        
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
           if (status === 'OK' && results[0]) {
@@ -201,12 +176,9 @@ function SofraniPaylas() {
       setError(`Harita başlatılamadı: ${error.message}`);
     }
   }, [locationData.latitude, locationData.longitude]);
-
-  // Popup açma fonksiyonu
   const handleOpenLocationPopup = async () => {
     console.log('Popup açılıyor...');
     setShowLocationPopup(true);
-    
     try {
       console.log('Google Maps API yükleniyor...');
       await loadGoogleMapsAPI();
@@ -215,56 +187,45 @@ function SofraniPaylas() {
       setTimeout(() => {
         const mapElement = document.getElementById('google-map');
         console.log('Map element:', mapElement);
-        
         if (mapElement) {
           console.log('Map element dimensions:', {
             width: mapElement.offsetWidth,
             height: mapElement.offsetHeight,
             display: window.getComputedStyle(mapElement).display
           });
-          
           if (mapElement.offsetWidth === 0 || mapElement.offsetHeight === 0) {
             console.error('Map element boyutları sıfır!');
             mapElement.style.width = '100%';
             mapElement.style.height = '300px';
             mapElement.style.display = 'block';
           }
-          
           initializeMap();
         } else {
           console.error('Harita elementi bulunamadı');
           setError("Harita elementi bulunamadı. Sayfa yenilemeyi deneyin.");
         }
       }, 1000);
-      
     } catch (error) {
       console.error("Google Maps yüklenemedi:", error);
       setError(`Harita yüklenemedi: ${error.message}. Lütfen API key'inizi kontrol edin.`);
     }
   };
-
-  // Adres değiştirildiğinde
   const handleAddressChange = (e) => {
     setLocationData(prev => ({ ...prev, address: e.target.value }));
   };
-
-  // Adresi haritadan güncelle
   const handleUpdateFromAddress = async () => {
     if (!window.google || !window.google.maps || !locationData.address) return;
-    
     const geocoder = new window.google.maps.Geocoder();
     geocoder.geocode({ address: locationData.address }, (results, status) => {
       if (status === 'OK' && results[0]) {
         const location = results[0].geometry.location;
         const lat = location.lat();
         const lng = location.lng();
-        
         setLocationData(prev => ({ 
           ...prev, 
           latitude: lat, 
           longitude: lng 
         }));
-        
         if (mapRef.current && markerRef.current) {
           mapRef.current.setCenter(location);
           markerRef.current.setPosition(location);
@@ -274,8 +235,6 @@ function SofraniPaylas() {
       }
     });
   };
-
-  // Kimlik doğrulama kontrolü
   const checkAuthentication = useCallback(() => {
     try {
       const isAuth = authService.isAuthenticated();
@@ -287,15 +246,12 @@ function SofraniPaylas() {
         // Header'ı her zaman güncel tut
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       }
-      
       return isAuth;
     } catch (error) {
       console.error('Authentication check hatası:', error);
       return false;
     }
   }, []);
-
-  // Form input değişiklikleri
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -303,8 +259,6 @@ function SofraniPaylas() {
       [name]: value
     }));
   };
-
-  // Fotoğraf yükleme
 const handlePhotoUpload = (e) => {
   const files = Array.from(e.target.files);
   setFormData(prev => ({
@@ -313,9 +267,6 @@ const handlePhotoUpload = (e) => {
     imageFile: files[0] // Geriye dönük uyumluluk için
   }));
 };
-
-
-  // Formu sıfırlama fonksiyonu
   const resetForm = () => {
     setFormData({
       package_name: '',
@@ -329,7 +280,6 @@ const handlePhotoUpload = (e) => {
       imageFile: null,
       images: []
     });
-    
     setLocationData({
       address: '',
       latitude: null,
@@ -342,8 +292,6 @@ const handlePhotoUpload = (e) => {
     setIsEditMode(false);
     setEditingPackage(null);
   };
-
-  // Form submit - Yeni paket oluşturma veya düzenleme
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
@@ -365,8 +313,6 @@ const handleSubmit = async (e) => {
     if (!availableFrom || !availableUntil) {
       throw new Error('Geçerlilik tarihlerini doldurun.');
     }
-
-    // ✅ GÜNCELLEME MODU KONTROLÜ
     if (editingPackage && editingPackage.package_id) {
       // 🔄 GÜNCELLEME İŞLEMİ - Sadece temel bilgiler
       const updateData = {
@@ -389,7 +335,6 @@ const handleSubmit = async (e) => {
       console.log("✅ Güncellenen paket:", response.data);
       
       alert("Paket başarıyla güncellendi!");
-      
     } else {
       // ➕ YENİ PAKET OLUŞTURMA İŞLEMİ
       const packageData = new FormData();
@@ -403,8 +348,6 @@ const handleSubmit = async (e) => {
       packageData.append('category_id', formData.category_id);
       packageData.append('available_from', availableFrom);
       packageData.append('available_until', availableUntil);
-
-      // Konum bilgisi
       if (locationData.latitude && locationData.longitude && locationData.address) {
         packageData.append('latitude', locationData.latitude);
         packageData.append('longitude', locationData.longitude);
@@ -414,12 +357,9 @@ const handleSubmit = async (e) => {
       } else {
         throw new Error('Konum bilgisi eksik.');
       }
-
-      // Fotoğrafları ekle (sadece yeni paket için)
       if (formData.photos && formData.photos.length > 0) {
         const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         const maxSize = 5 * 1024 * 1024; // 5MB
-
         formData.photos.forEach(file => {
           if (!validTypes.includes(file.type)) {
             throw new Error(`Geçersiz dosya tipi: ${file.name}`);
@@ -445,8 +385,6 @@ const handleSubmit = async (e) => {
       
       alert("Paket başarıyla oluşturuldu!");
     }
-
-    // İşlem tamamlandığında formu temizle ve aktif paketler sekmesine git
     resetForm();
     setActiveTab('aktifpaketler');
     
@@ -470,8 +408,6 @@ const handleSubmit = async (e) => {
         await packageService.cancelPackage(paketId, { 
           cancellation_reason: cancelReason || "Satıcı tarafından iptal edildi" 
         });
-        
-        // Geri kalan kod aynı...
         setPaketlerim(prevPaketler => 
           prevPaketler.filter(p => 
             p.id !== paketId && p.package_id !== paketId
@@ -479,9 +415,7 @@ const handleSubmit = async (e) => {
         );
         
         alert("Paket başarıyla iptal edildi.");
-        
       } catch (err) {
-        // Hata handling kodu aynı...
       } finally {
         setLoading(false);
       }
@@ -520,8 +454,6 @@ const refreshOrders = async () => {
     setLoading(false);
   }
 };
-
-// 5. Teslimat kodu doğrulama fonksiyonu
 const handleVerifyCode = async (orderId) => {
   if (!verificationCode.trim()) {
     alert('Lütfen doğrulama kodunu girin.');
@@ -534,7 +466,6 @@ const handleVerifyCode = async (orderId) => {
     const response = await orderService.verifyDeliveryCode(orderId, verificationCode);
     
     if (response && response.data.success) {
-      // Sipariş durumunu güncelle
       setSiparisler(prev => prev.map(order => 
         order.id === orderId 
           ? { ...order, status: 'completed', delivery_verified: true }
@@ -561,16 +492,12 @@ const handleVerifyCode = async (orderId) => {
     setLoading(false);
   }
 };
-
-// 6. Sipariş hazır olarak işaretleme
 const handleMarkReady = async (orderId) => {
   if (window.confirm('Bu siparişi hazır olarak işaretlemek istediğinizden emin misiniz?')) {
     try {
       setLoading(true);
       
       await orderService.markOrderReady(orderId);
-      
-      // State'i güncelle
       setSiparisler(prev => prev.map(order => 
         order.id === orderId 
           ? { ...order, status: 'ready' }
@@ -587,20 +514,14 @@ const handleMarkReady = async (orderId) => {
     }
   }
 };
-
-// 7. Sipariş detaylarını görüntüleme
 const handleShowOrderDetail = (order) => {
   setSelectedOrder(order);
   setShowOrderDetail(true);
 };
-
-// 8. Siparişleri filtreleme
 const filteredOrders = siparisler.filter(order => {
   if (filterStatus === 'all') return true;
   return order.status === filterStatus;
 });
-
-// 9. Sipariş durumu için renk ve metin döndürme
 const getOrderStatusInfo = (status) => {
   switch (status) {
     case 'pending':
@@ -626,12 +547,8 @@ const getOrderStatusInfo = (status) => {
       setError('Düzenlenecek paket verisi bulunamadı.');
       return;
     }
-    
-    // Düzenleme modunu etkinleştir
     setIsEditMode(true);
     setEditingPackage(paket);
-    
-    // Tarih formatı fonksiyonu (datetime-local için)
     const formatDateForInput = (dateString) => {
       if (!dateString) return '';
       try {
@@ -708,8 +625,6 @@ const getOrderStatusInfo = (status) => {
       
       if (response && response.data) {
         let packagesData = [];
-        
-        // Farklı response formatlarını kontrol et
         if (Array.isArray(response.data)) {
           packagesData = response.data;
         } else if (response.data.data && Array.isArray(response.data.data)) {
@@ -730,13 +645,10 @@ const getOrderStatusInfo = (status) => {
       
     } catch (err) {
       console.error("Paketler yüklenirken hata:", err);
-      
-      // Detaylı hata kontrolü
       if (err.response) {
         console.error('Response hatası:', err.response.status, err.response.data);
         
         if (err.response.status === 401) {
-          // Token yenileme deneme
           try {
             const newToken = authService.refreshToken();
             if (newToken) {
@@ -807,10 +719,7 @@ const getImageUrl = (paket) => {
   console.log('🖼️ getImageUrl çağrıldı:', paket);
   
   try {
-    // Paket nesnesinden resim yolunu al
     let imagePath = '';
-    
-    // Tüm olası alan isimlerini kontrol et
     const possibleImageFields = [
       'image_url', 'imageUrl', 'image_path', 'image', 
       'photo_url', 'picture_url', 'thumbnail'
@@ -825,8 +734,6 @@ const getImageUrl = (paket) => {
         break;
       }
     }
-    
-    // Images array'ini kontrol et
     if (!imagePath && paket.images && Array.isArray(paket.images) && paket.images.length > 0) {
       const firstImage = paket.images[0];
       imagePath = firstImage.image_url || firstImage.path || firstImage.url || firstImage;
@@ -838,27 +745,18 @@ const getImageUrl = (paket) => {
       // Base64 placeholder döndür
       return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPllFTUVLPC90ZXh0Pgo8L3N2Zz4K';
     }
-    
-    // Path'i normalize et
     let normalizedPath = imagePath.replace(/\\/g, '/');
-    
-    // Eğer zaten tam URL ise direkt return et
+
     if (normalizedPath.startsWith('http')) {
       console.log('🔗 Tam URL bulundu:', normalizedPath);
       return normalizedPath;
     }
-    
     // Backend URL'ini oluştur - API URL'den base URL'i çıkar
     const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5051/api';
-    const baseURL = apiUrl.replace('/api', ''); // /api kısmını çıkar
-    
-    // ✅ DÜZELTME: Slash kontrolü ve eklenmesi
-    // Başında / yoksa ekle
+    const baseURL = apiUrl.replace('/api', ''); 
     if (!normalizedPath.startsWith('/')) {
       normalizedPath = '/' + normalizedPath;
     }
-    
-    // ✅ DÜZELTME: Base URL'de trailing slash kontrolü
     const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
     const fullImageUrl = `${cleanBaseURL}${normalizedPath}`;
     
@@ -875,7 +773,6 @@ const getImageUrl = (paket) => {
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPllFTUVLPC90ZXh0Pgo8L3N2Zz4K';
   }
 };
-
 const getImageUrlAlternative = (paket) => {
   try {
     let imagePath = paket.image_url || paket.imageUrl || paket.image_path || paket.image;
@@ -885,11 +782,7 @@ const getImageUrlAlternative = (paket) => {
     }
     
     if (!imagePath) return '/default-package-image.jpg';
-    
-    // Windows path'lerini düzelt
     const normalizedPath = imagePath.replace(/\\/g, '/');
-    
-    // Eğer zaten tam URL ise direkt return et
     if (normalizedPath.startsWith('http')) {
       return normalizedPath;
     }
@@ -938,7 +831,6 @@ const getImageUrlAlternative = (paket) => {
       setLoading(false);
     }
   };
-
   // Ana useEffect
   useEffect(() => {
     const isAuth = checkAuthentication();
@@ -1041,7 +933,6 @@ const getImageUrlAlternative = (paket) => {
       setLoading(false);
     }
   }, [checkAuthentication]);
-
   // Tab değişimi useEffect
   useEffect(() => {
     if (activeTab === 'paketolustur' && isAuthenticated) {
@@ -1070,7 +961,6 @@ const getImageUrlAlternative = (paket) => {
       refreshPackageHistory();
     }
   }, [activeTab, isAuthenticated]);
-
   // Kimlik doğrulama yönlendirmesi
   useEffect(() => {
     if (isAuthenticated === false) {
@@ -1095,7 +985,6 @@ const getImageUrlAlternative = (paket) => {
       refreshPackages();
     }
   }, [isAuthenticated]);
-
   // Loading durumu
   if (loading && !isAuthenticated) {
     return (
@@ -1105,7 +994,6 @@ const getImageUrlAlternative = (paket) => {
       </div>
     );
   }
-
   // Kimlik doğrulama başarısız
   if (isAuthenticated === false) {
     return (
@@ -1119,7 +1007,6 @@ const getImageUrlAlternative = (paket) => {
       </div>
     );
   }
-
   // Hata mesajı bileşeni
   const ErrorMessage = ({ message }) => (
     <div className="error-message">
@@ -1135,10 +1022,8 @@ const getImageUrlAlternative = (paket) => {
       {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
-         
           <span className="subtitle">Yönetim Paneli</span>
         </div>
-        
         <nav className="sidebar-nav">
           <div 
             className={`nav-item ${activeTab === 'istatistikler' ? 'active' : ''}`}
@@ -1171,9 +1056,7 @@ const getImageUrlAlternative = (paket) => {
             <FaHistory className="nav-icon" />
             <span>Geçmiş Paketler</span>
           </div>
-
         </nav>
-        
         <div className="sidebar-stats">
           <div className="stats-title">Özet İstatistikler</div>
           <div className="mini-stat">
@@ -1243,7 +1126,6 @@ const getImageUrlAlternative = (paket) => {
                   />
                 </div>
               </div>
-              
               <div className="form-row">
                 <div className="form-group">
                   <label>Ürün Adedi</label>
@@ -1278,7 +1160,6 @@ const getImageUrlAlternative = (paket) => {
                   />
                 </div>
               </div>
-              
               <div className="form-group">
                 <label>Paket İçeriği</label>
                 <textarea 
@@ -1289,7 +1170,6 @@ const getImageUrlAlternative = (paket) => {
                   required
                 ></textarea>
               </div>
-              
               {/* FOTOĞRAF YÜKLEME ALANI */}
               <div className="form-group">
                 <label>Fotoğraf Ekle</label>
@@ -1316,9 +1196,6 @@ const getImageUrlAlternative = (paket) => {
                   )}
                 </div>
               </div>
-
-
-              
               <div className="form-group">
                 <label>Teslim Adresi</label>
                 <div className="map-container">
@@ -1329,15 +1206,13 @@ const getImageUrlAlternative = (paket) => {
                       className="btn-secondary"
                     >
                       <FaMapMarkerAlt /> Haritadan Konum Seç
-                    </button>
-                    
+                    </button>                    
                     {locationData.address && (
                       <div className="adres-bilgi">
                         <FaMapMarkerAlt /> {locationData.address} 
                         ({locationData.latitude?.toFixed(6)}, {locationData.longitude?.toFixed(6)})
                       </div>
-                    )}
-                    
+                    )}                    
                     {showLocationPopup && (
                       <div className="adres-popup">
                         <div className="popup-icerik">
@@ -1363,8 +1238,6 @@ const getImageUrlAlternative = (paket) => {
                         </div>
                       </div>
                     )}
-                    
-                    {/* Kayıtlı lokasyonlar dropdown */}
                     <div className="form-group">
                       <label>Veya Kayıtlı Lokasyon Seç</label>
                       <select 
@@ -1484,15 +1357,13 @@ const getImageUrlAlternative = (paket) => {
                       <FaPlus /> Yeni Paket Ekle
                     </button>
                   </div>
-                </div>
-            
+                </div>           
             {loading && (
               <div className="loading-indicator">
                 <div className="spinner"></div>
                 <p>Yükleniyor...</p>
               </div>
-            )}
-            
+            )}           
             {!loading && paketlerim.length === 0 && (
               <div className="no-packages">
                 <p>Aktif paketiniz bulunmamaktadır.</p>
@@ -1500,8 +1371,7 @@ const getImageUrlAlternative = (paket) => {
                   <FaPlus /> Yeni Paket Oluştur
                 </button>
               </div>
-            )}
-            
+            )}           
             <div className="paket-list">
               {paketlerim.map((paket, index) => (
                 <div key={paket.id || index} className="paket-card">
@@ -1526,7 +1396,6 @@ const getImageUrlAlternative = (paket) => {
                       }}
                     />
                   </div>
-
                   <div className="paket-details">
                     <h3>{paket.package_name || paket.baslik}</h3>
                     <div className="price-container">
@@ -1556,21 +1425,18 @@ const getImageUrlAlternative = (paket) => {
             <div className="content-header">
               <h2>Geçmiş Paketlerim</h2>
               <p className="content-subtitle">İptal edilmiş ve tamamlanmış paketleriniz</p>
-            </div>
-            
+            </div>           
             {loading && (
               <div className="loading-indicator">
                 <div className="spinner"></div>
                 <p>Yükleniyor...</p>
               </div>
-            )}
-            
+            )}           
             {!loading && gecmisPaketler.length === 0 && (
               <div className="no-packages">
                 <p>Geçmiş paketiniz bulunmamaktadır.</p>
               </div>
-            )}
-            
+            )} 
             <div className="paket-list history">
               {gecmisPaketler.map((paket, index) => (
                 <div key={paket.package_id || index} className="paket-card cancelled">
@@ -1584,7 +1450,6 @@ const getImageUrlAlternative = (paket) => {
                               (paket.images[0].image_path
                                 ? (
                                     ((path => {
-                                      // Hem tek hem çift ters slash'ı düz slash'a çevir
                                       const fixedPath = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
                                       return (fixedPath.startsWith('/')
                                         ? (process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000') + fixedPath
@@ -1601,7 +1466,6 @@ const getImageUrlAlternative = (paket) => {
                         e.target.src = '/assets/placeholder-food.png';
                       }}
                     />
-
                     <div className="status-badge danger">İptal Edildi</div>
                   </div>
                   <div className="paket-details">
@@ -1622,19 +1486,14 @@ const getImageUrlAlternative = (paket) => {
               ))}
             </div>
           </div>
-        )}
-        
+        )}       
         {activeTab === 'istatistikler' && (
              <StatisticsDashboard />
-            
-        )}
-
-
+           )}
         </div>
       </div>
     </div>
   </div>
   );
 }
-
 export default SofraniPaylas;

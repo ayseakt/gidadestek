@@ -12,6 +12,7 @@ const WelcomeScreen = ({ onComplete }) => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -63,7 +64,7 @@ const WelcomeScreen = ({ onComplete }) => {
     }
   };
 
-  // Giriş yap fonksiyonu - GÜNCELLENDİ
+  // Giriş yap fonksiyonu
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -92,7 +93,7 @@ const WelcomeScreen = ({ onComplete }) => {
       // Token ve kullanıcı bilgilerini localStorage'a kaydet
       if (result.token) {
         localStorage.setItem('token', result.token);
-        localStorage.setItem('authToken', result.token); // Alternatif anahtar
+        localStorage.setItem('authToken', result.token);
       }
       
       if (result.user) {
@@ -114,7 +115,7 @@ const WelcomeScreen = ({ onComplete }) => {
           phone: '',
         });
         
-        // Ana uygulamaya geçiş yap - biraz gecikme ekle
+        // Ana uygulamaya geçiş yap
         setTimeout(() => {
           onComplete(normalizedUser);
         }, 100);
@@ -130,78 +131,67 @@ const WelcomeScreen = ({ onComplete }) => {
     }
   };
 
-  // Misafir olarak devam et fonksiyonu - GÜNCELLENDİ
-  const handleGuestContinue = async () => {
+  // Şifre sıfırlama fonksiyonu
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
-    
+    setError('');
+
     try {
-      const response = await fetch('http://localhost:5051/api/auth/guest', {
+      const response = await fetch('http://localhost:5051/api/auth/forgot-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          email: formData.email,
+        }),
       });
 
       const result = await response.json();
       
-      if (result.success && result.token) {
-        localStorage.setItem('token', result.token);
-        localStorage.setItem('authToken', result.token);
-        localStorage.setItem('isGuest', 'true');
-        
-        // Misafir kullanıcı bilgisi oluştur
-        const guestUser = {
-          id: 'guest',
-          user_id: 'guest',
-          userId: 'guest',
-          name: 'Misafir Kullanıcı',
-          email: '',
-          isGuest: true
-        };
-        
-        localStorage.setItem('user', JSON.stringify(guestUser));
-        
-        setTimeout(() => {
-          onComplete(guestUser);
-        }, 100);
-      } else {
-        // API başarısız olsa bile misafir olarak devam et
-        const guestUser = {
-          id: 'guest',
-          user_id: 'guest',
-          userId: 'guest',
-          name: 'Misafir Kullanıcı',
-          email: '',
-          isGuest: true
-        };
-        
-        localStorage.setItem('isGuest', 'true');
-        localStorage.setItem('user', JSON.stringify(guestUser));
-        
-        setTimeout(() => {
-          onComplete(guestUser);
-        }, 100);
+      if (!result.success) {
+        throw new Error(result.message || 'Şifre sıfırlama e-postası gönderilemedi');
       }
-    } catch (error) {
-      console.error('Misafir giriş hatası:', error);
       
-      // Hata olsa bile misafir olarak devam et
-      const guestUser = {
-        id: 'guest',
-        user_id: 'guest',
-        userId: 'guest',
-        name: 'Misafir Kullanıcı',
-        email: '',
-        isGuest: true
-      };
+      console.log('Şifre sıfırlama e-postası gönderildi:', result);
+      setResetEmailSent(true);
       
-      localStorage.setItem('isGuest', 'true');
-      localStorage.setItem('user', JSON.stringify(guestUser));
-      
+      // 3 saniye sonra giriş sayfasına yönlendir
       setTimeout(() => {
-        onComplete(guestUser);
-      }, 100);
+        setCurrentPage(2);
+        setResetEmailSent(false);
+        setFormData({ ...formData, email: '' });
+      }, 3000);
+
+    } catch (error) {
+      console.error('Şifre sıfırlama hatası:', error);
+      setError(error.message || 'Şifre sıfırlama e-postası gönderilirken bir hata oluştu');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // Google ile giriş fonksiyonu - YENİ
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      // Google OAuth URL'ini oluştur
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${process.env.REACT_APP_GOOGLE_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(window.location.origin + '/auth/google/callback')}&` +
+        `response_type=code&` +
+        `scope=email profile&` +
+        `state=${Math.random().toString(36).substring(7)}`;
+
+      // Google OAuth sayfasına yönlendir
+      window.location.href = googleAuthUrl;
+      
+    } catch (error) {
+      console.error('Google giriş hatası:', error);
+      setError('Google ile giriş yapılırken bir hata oluştu');
       setLoading(false);
     }
   };
@@ -209,6 +199,8 @@ const WelcomeScreen = ({ onComplete }) => {
   // Şifremi unuttum sayfasına git
   const handleForgotPassword = () => {
     setCurrentPage(3);
+    setError('');
+    setFormData({ ...formData, email: '', password: '' });
   };
 
   const pages = [
@@ -237,8 +229,6 @@ const WelcomeScreen = ({ onComplete }) => {
             Giriş Yap
           </button>
         </div>
-        
-
       </div>
     </div>,
     
@@ -324,7 +314,17 @@ const WelcomeScreen = ({ onComplete }) => {
           <span>veya</span>
         </div>
         
-
+        <div className="social-buttons">
+          <button 
+            type="button" 
+            className="social-button google"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+          >
+            <i className="fab fa-google"></i>
+            {loading ? 'Yükleniyor...' : 'Google ile kayıt ol'}
+          </button>
+        </div>
       </form>
     </div>,
     
@@ -389,17 +389,76 @@ const WelcomeScreen = ({ onComplete }) => {
         </div>
         
         <div className="social-buttons">
-          <button type="button" className="social-button google">
+          <button 
+            type="button" 
+            className="social-button google"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+          >
             <i className="fab fa-google"></i>
-            Google ile giriş yap
-          </button>
-          
-          <button type="button" className="social-button facebook">
-            <i className="fab fa-facebook-f"></i>
-            Facebook ile giriş yap
+            {loading ? 'Yükleniyor...' : 'Google ile giriş yap'}
           </button>
         </div>
       </form>
+    </div>,
+
+    // Şifremi Unuttum sayfası
+    <div key="forgot-password" className="auth-page">
+      <div className="page-header">
+        <button className="back-button" onClick={() => setCurrentPage(2)}>
+          <i className="fas fa-arrow-left"></i>
+        </button>
+        <h2>Şifremi Unuttum</h2>
+      </div>
+      
+      {error && <div className="error-message">{error}</div>}
+      {resetEmailSent && (
+        <div className="success-message">
+          Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. E-postanızı kontrol edin ve gelen bağlantıya tıklayarak şifrenizi sıfırlayın.
+        </div>
+      )}
+      
+      <div className="forgot-password-info">
+        <p>E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.</p>
+      </div>
+      
+      <form onSubmit={handleForgotPasswordSubmit} className="auth-form">
+        <div className="form-group">
+          <label htmlFor="forgot-email">E-posta</label>
+          <input
+            type="email"
+            id="forgot-email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="E-posta adresiniz"
+            required
+          />
+        </div>
+        
+        <button 
+          type="submit" 
+          className="primary-button full-width"
+          disabled={loading || resetEmailSent}
+        >
+          {loading ? 'Gönderiliyor...' : resetEmailSent ? 'E-posta Gönderildi' : 'Şifre Sıfırlama Bağlantısı Gönder'}
+        </button>
+      </form>
+      
+      <div className="auth-footer">
+        <p>
+          Şifrenizi hatırladınız mı? 
+          <a 
+            href="#" 
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentPage(2);
+            }}
+          >
+            Giriş Yap
+          </a>
+        </p>
+      </div>
     </div>
   ];
 

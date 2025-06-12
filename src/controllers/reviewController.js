@@ -9,7 +9,7 @@ const {
   sequelize
 } = require('../models');
 const { Op } = require('sequelize');
-
+const { PackageImage } = require('../models');
 class ReviewController {
   // ✅ Yorum oluşturma (düzeltilmiş - doğru seller_id kullanımı)
 // ReviewController.js - createReview metodunu bu şekilde güncelleyin:
@@ -221,11 +221,17 @@ static async getUserReviews(req, res) {
           attributes: [
             'package_id', 
             'package_name', 
-            'discounted_price',
-            // 'image_url' // ✅ image_url eklendi
+            'discounted_price'
           ],
           required: false,
           include: [
+            {
+              model: PackageImage,
+              as: 'images',
+              attributes: ['image_path', 'is_primary'],
+              where: { is_primary: true },
+              required: false
+            },
             {
               model: Seller,
               as: 'seller',
@@ -249,7 +255,7 @@ static async getUserReviews(req, res) {
       review_id: review.review_id,
       seller_name: review.seller?.business_name || 'Satıcı Bulunamadı',
       product_name: review.package?.package_name || 'Ürün Bulunamadı',
-      // product_image: review.package?.image_url || '/default-food.jpg', // ✅ product_image eklendi
+      product_image: review.package?.images?.[0]?.image_path || '/default-food.jpg',
       
       // ✅ Rating alanları düzgün şekilde eklendi
       rating: review.rating,

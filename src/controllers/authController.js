@@ -1,6 +1,7 @@
 // authController.js - Fixed Version
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { User, UserProfile, sequelize } = require('../models');
 const Seller = require('../models/Seller');
 
@@ -222,6 +223,144 @@ exports.guestLogin = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Misafir girişi sırasında bir hata oluştu'
+    });
+  }
+};
+
+// Şifremi unuttum - YENİ FONKSİYON
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Input validasyonu
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'E-posta adresi gerekli'
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findOne({ where: { email } });
+
+    // Güvenlik için: Kullanıcı bulunmasa bile başarılı mesajı döndür
+    // (Bu sayede saldırganlar hangi e-postaların kayıtlı olduğunu öğrenemez)
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: 'Eğer bu e-posta adresine kayıtlı bir hesap varsa, şifre sıfırlama bağlantısı gönderilmiştir.'
+      });
+    }
+
+    // Şifre sıfırlama token'ı oluştur
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    
+    // Token'ın geçerlilik süresi (1 saat)
+    const tokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 saat
+
+    // Token'ı veritabanına kaydet
+    await User.update({
+      password_reset_token: hashedToken,
+      password_reset_expires: tokenExpires
+    }, {
+      where: { user_id: user.user_id }
+    });
+
+    // E-posta gönderme işlemi (şimdilik konsola log at)
+    // Gerçek uygulamada burada nodemailer veya başka bir e-posta servisi kullanılır
+    const resetURL = `http://localhost:3000/reset-password?token=${resetToken}`;
+    
+    console.log('🔗 Şifre sıfırlama bağlantısı:', resetURL);
+    console.log('📧 E-posta gönderilecek adres:', email);
+    console.log('⏰ Token geçerlilik süresi:', tokenExpires);
+
+    // TODO: Burada gerçek e-posta gönderme kodu olacak
+    // await sendPasswordResetEmail(email, resetURL);
+
+    res.status(200).json({
+      success: true,
+      message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderilmiştir.',
+      // Development ortamında token'ı döndür (production'da kaldırılmalı)
+      ...(process.env.NODE_ENV === 'development' && { 
+        resetURL: resetURL,
+        token: resetToken 
+      })
+    });
+
+  } catch (error) {
+    console.error('Şifre sıfırlama hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Şifre sıfırlama e-postası gönderilirken bir hata oluştu'
+    });
+  }
+};
+
+// Şifre sıfırlama onaylama - YENİ FONKSİYON
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    // Input validasyonu
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token ve yeni şifre gerekli'
+      });
+    }
+
+    // Şifre uzunluğu kontrolü
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Şifre en az 8 karakter olmalıdır'
+      });
+    }
+
+    // Token'ı hash'le
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Token'ı ve geçerlilik süresini kontrol et
+    const user = await User.findOne({
+      where: {
+        password_reset_token: hashedToken,
+        password_reset_expires: {
+          [require('sequelize').Op.gt]: new Date() // Token henüz geçerli mi?
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Geçersiz veya süresi dolmuş token'
+      });
+    }
+
+    // Yeni şifreyi hash'le
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Şifreyi güncelle ve token'ları temizle
+    await User.update({
+      password_hash: hashedPassword,
+      password_reset_token: null,
+      password_reset_expires: null
+    }, {
+      where: { user_id: user.user_id }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Şifreniz başarıyla güncellendi. Yeni şifrenizle giriş yapabilirsiniz.'
+    });
+
+  } catch (error) {
+    console.error('Şifre sıfırlama onaylama hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Şifre sıfırlanırken bir hata oluştu'
     });
   }
 };

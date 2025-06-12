@@ -14,7 +14,7 @@ import {
   FaSpinner
 } from 'react-icons/fa';
 import './MyReview.css';
-
+const backendUrl = "http://localhost:5051";
 // Style objeleri
 const styles = {
   container: { 
@@ -58,14 +58,14 @@ const styles = {
     backgroundColor: '#f8f9fa',
     borderBottom: '1px solid #eee'
   },
-  productImage: {
-    width: '120px',
-    height: '120px',
-    objectFit: 'cover',
-    borderRadius: '8px',
-    border: '1px solid #ddd',
-    backgroundColor: '#f8f9fa'
-  },
+ productImage: {
+  width: 80,
+  height: 80,
+  objectFit: 'cover',
+  borderRadius: 8,
+  border: '1px solid #eee',
+  background: '#fafafa'
+},
   ratingRow: { 
     marginBottom: '8px', 
     display: 'flex', 
@@ -534,17 +534,7 @@ const MyReviews = () => {
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
-          <button 
-            style={styles.backButton}
-            onClick={() => navigate(-1)}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#f0f0f0'}
-            onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
-          >
-            <FaArrowLeft />
-          </button>
-          <h1 style={{ margin: 0, color: '#333', fontSize: '24px' }}>
-            Değerlendirmelerim ({filteredAndSortedReviews.length})
-          </h1>
+
         </div>
 
         {/* Filters */}
@@ -761,11 +751,17 @@ const MyReviews = () => {
                 <div style={{ display: 'flex', padding: '20px', gap: '20px' }}>
                   {/* Product Image */}
                   <div style={{ flexShrink: 0 }}>
-                    <img 
-                      src={review.product_image || '/default-food.jpg'} 
-                      alt={review.product_name || 'Ürün'} 
+                    <img
+                      src={
+                        review.product_image
+                          ? (review.product_image.startsWith('http')
+                              ? review.product_image
+                              : `${backendUrl}/${review.product_image.replace(/\\\\/g, "/").replace(/\\/g, "/")}`)
+                          : '/default-food.jpg'
+                      }
+                      alt={review.product_name || 'Ürün'}
                       style={styles.productImage}
-                      onError={handleImageError}
+                      onError={e => { e.target.src = '/default-food.jpg'; }}
                     />
                   </div>
 
