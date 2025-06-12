@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const ReviewController = require('../controllers/reviewController');
-const { getSellerAverageRating } = require('./reviewController');
 // ✅ Yorum oluşturma (sadece teslim edilmiş siparişler için)
 router.post('/create', authMiddleware, ReviewController.createReview);
 

@@ -14,7 +14,7 @@ const slides = [
     subtitle: "Her gün milyonlarca taze ürün çöpe gidiyor",
     stat: "26 milyon ekmek/gün",
     description: "Türkiye'de günlük israf edilen ekmek miktarı",
-    overlay: "rgba(46, 125, 50, 0.7)"
+    overlay: "rgba(217, 20, 20, 0.26)"
   },
   {
     id: 2,
@@ -23,7 +23,7 @@ const slides = [
     subtitle: "Aileler farkında olmadan ne kadar israf ediyor",
     stat: "%43 ev israfı",
     description: "Toplam gıda israfının neredeyse yarısı evlerde oluyor",
-    overlay: "rgba(56, 142, 60, 0.7)"
+    overlay: "rgba(240, 112, 14, 0.52)"
   },
   {
     id: 3,
@@ -32,7 +32,7 @@ const slides = [
     subtitle: "Bir tarafta israf, diğer tarafta açlık",
     stat: "828 milyon insan aç",
     description: "Dünyada 1/3 yemek israf edilirken açlık sürüyor",
-    overlay: "rgba(67, 160, 71, 0.7)"
+    overlay: "rgba(61, 204, 18, 0.7)"
   },
   {
     id: 4,
@@ -41,7 +41,7 @@ const slides = [
     subtitle: "Satış noktalarında biriken sağlıklı gıdalar",
     stat: "40% indirim",
     description: "Son kullanma tarihi yakın ürünler kurtarılmayı bekliyor",
-    overlay: "rgba(76, 175, 80, 0.7)"
+    overlay: "rgba(175, 76, 119, 0.7)"
   },
   {
     id: 5,
@@ -59,7 +59,7 @@ const slides = [
     subtitle: "Hasat öncesi ve sonrası israf",
     stat: "%25 üretim kaybı",
     description: "Ürünler tarladan sofraya gelirken kaybolup gidiyor",
-    overlay: "rgba(56, 142, 60, 0.7)"
+    overlay: "rgba(122, 56, 142, 0.7)"
   },
   {
     id: 7,
@@ -68,7 +68,7 @@ const slides = [
     subtitle: "Birlikte israfı durdurabiliriz",
     stat: "50k+ kullanıcı",
     description: "Şimdiden binlerce kişi gıda kurtarma hareketinde",
-    overlay: "rgba(67, 160, 71, 0.7)"
+    overlay: "rgba(76, 195, 21, 0.7)"
   }
 ];
   useEffect(() => {
@@ -186,7 +186,7 @@ const slides = [
           margin: 20px 0;
           border-radius: 20px;
           overflow: hidden;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+          box-shadow: 0 20px 40px rgba(34, 10, 187, 0.34);
         }
 
         .slider-wrapper {
@@ -246,8 +246,8 @@ const slides = [
           font-size: 2.5rem;
           font-weight: 800;
           margin: 0 0 15px 0;
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-          background: linear-gradient(45deg, #2E7D32, #388E3C);
+          text-shadow: 2px 2px 4px rgba(255, 8, 8, 0.5);
+          background: linear-gradient(45deg,rgb(218, 127, 16),rgb(237, 229, 3));
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -257,16 +257,16 @@ const slides = [
           font-size: 1.3rem;
           margin: 0 0 25px 0;
           opacity: 0.95;
-          text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+          text-shadow: 1px 1px 2px rgba(13, 254, 81, 0.3);
         }
 
         .slide-stats {
-          background: rgba(255, 255, 255, 0.15);
+          background: rgba(170, 30, 30, 0.56);
           backdrop-filter: blur(10px);
           border-radius: 15px;
           padding: 20px;
           margin: 25px 0;
-          border: 1px solid rgba(255, 255, 255, 0.2);
+          border: 1px solid rgba(191, 21, 21, 0.91);
         }
 
         .stat-number {
@@ -274,7 +274,7 @@ const slides = [
           font-weight: 900;
           color: #FFD700;
           margin-bottom: 8px;
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+          text-shadow: 2px 2px 4px rgba(61, 8, 255, 0.42);
         }
 
         .stat-description {
@@ -287,7 +287,7 @@ const slides = [
         }
 
         .cta-button {
-          background: linear-gradient(45deg, #4CAF50, #45a049);
+          background: linear-gradient(45deg,rgb(76, 175, 160),rgb(69, 160, 139));
           color: white;
           border: none;
           padding: 15px 30px;
@@ -296,19 +296,19 @@ const slides = [
           border-radius: 50px;
           cursor: pointer;
           transition: all 0.3s ease;
-          box-shadow: 0 8px 15px rgba(46, 125, 50, 0.3);
+          box-shadow: 0 8px 15px rgba(46, 17, 209, 0.3);
         }
 
         .cta-button:hover {
           transform: translateY(-3px);
-          box-shadow: 0 12px 20px rgba(76, 175, 80, 0.4);
+          box-shadow: 0 12px 20px rgba(175, 76, 97, 0.4);
         }
 
         .nav-arrow {
           position: absolute;
           top: 50%;
           transform: translateY(-50%);
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(219, 41, 119, 0.6);
           backdrop-filter: blur(10px);
           border: none;
           color: white;
@@ -334,7 +334,7 @@ const slides = [
         }
 
         .nav-arrow:hover {
-          background: rgba(255, 255, 255, 0.3);
+          background: rgba(225, 34, 34, 0.47);
           transform: translateY(-50%) scale(1.1);
         }
 
@@ -342,7 +342,7 @@ const slides = [
           position: absolute;
           top: 20px;
           right: 20px;
-          background: rgba(0, 0, 0, 0.5);
+          background: rgba(171, 7, 7, 0.5);
           border: none;
           color: white;
           padding: 10px;
@@ -358,7 +358,7 @@ const slides = [
         }
 
         .play-pause-btn:hover {
-          background: rgba(0, 0, 0, 0.7);
+          background: rgba(231, 12, 12, 0.7);
         }
 
         .slide-indicators {
@@ -375,14 +375,14 @@ const slides = [
           width: 12px;
           height: 12px;
           border-radius: 50%;
-          border: 2px solid rgba(255, 255, 255, 0.5);
+          border: 2px solid rgba(241, 16, 16, 0.5);
           background: transparent;
           cursor: pointer;
           transition: all 0.3s ease;
         }
 
         .indicator.active {
-          background: #FFD700;
+          background:rgb(176, 12, 185);
           border-color: #FFD700;
           transform: scale(1.2);
         }
@@ -407,7 +407,7 @@ const slides = [
         }
 
         .impact-item {
-          background: rgba(0, 0, 0, 0.6);
+          background: rgba(205, 18, 18, 0.6);
           backdrop-filter: blur(10px);
           padding: 8px 12px;
           border-radius: 20px;
@@ -424,7 +424,7 @@ const slides = [
 
         .impact-number {
           font-weight: 700;
-          color: #FFD700;
+          color:rgb(146, 232, 16);
         }
 
         .impact-label {
@@ -454,7 +454,7 @@ const slides = [
             opacity: 1;
             justify-content: center;
             margin-top: 15px;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(236, 14, 14, 0.3);
             padding: 10px;
             border-radius: 15px;
           }
