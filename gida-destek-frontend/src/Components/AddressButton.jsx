@@ -6,7 +6,7 @@ import LocationService from '../services/locationService';
 
 const AddressButton = () => {
   const { user } = useAuth();
-  
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
   // Kullanıcı ID'sini al - farklı kaynaklardan
   const getUserId = () => {
     // 1. Context'ten al
@@ -27,7 +27,12 @@ const AddressButton = () => {
     
     return null;
   };
-
+const showToast = (message, type = 'success') => {
+  setToast({ show: true, message, type });
+  setTimeout(() => {
+    setToast({ show: false, message: '', type: '' });
+  }, 3000);
+};
  const finalUserId = useMemo(() => {
   if (user?.id) return user.id;
   if (user?.user_id) return user.user_id;
@@ -379,7 +384,7 @@ const loadSavedAddresses = useCallback(async () => {
         },
         (error) => {
           console.error("Konum alınamadı:", error);
-          alert("Konum izni verilmedi veya konum alınamadı.");
+          showToast('Konum izni verilmedi veya konum alınamadı.', 'error');
         }
       );
     } else {
@@ -390,12 +395,14 @@ const loadSavedAddresses = useCallback(async () => {
   // Yeni adres ekle
   const handleAddAddress = async () => {
     if (!addressName || !addressDetails || !selectedLocation) {
-      alert("Lütfen tüm alanları doldurun ve haritada bir konum seçin.");
+      
+      showToast('Lütfen tüm alanları doldurun ve haritada bir konum seçin.', 'error');
       return;
     }
     
     if (!finalUserId) {
-      alert("Kullanıcı bilgisi eksik. Lütfen tekrar giriş yapın.");
+      showToast('Kullanıcı bilgisi eksik. Lütfen tekrar giriş yapın.', 'error');
+
       return;
     }
     
@@ -452,9 +459,10 @@ const loadSavedAddresses = useCallback(async () => {
       setAddressDetails('');
       setSelectedLocation(null);
       setShowMapPanel(false);
-      alert('Adres başarıyla kaydedildi!');
+      showToast('Adres başarıyla kaydedildi!', 'error');
+
     } else {
-      alert('Adres kaydedilirken bir hata oluştu.');
+      showToast('Adres kaydedilirken bir hata oluştu.', 'error');
     }
     
     setLoading(false);
@@ -463,7 +471,7 @@ const loadSavedAddresses = useCallback(async () => {
   // ✅ DÜZELTİLMİŞ: Adres seç fonksiyonu
   const handleSelectAddress = async (address) => {
     if (!finalUserId) {
-      alert("Kullanıcı bilgisi eksik. Lütfen tekrar giriş yapın.");
+      showToast('Kullanıcı bilgisi eksik. Lütfen tekrar giriş yapın.', 'error');
       console.error('handleSelectAddress - userId yok:', finalUserId);
       return;
     }
@@ -640,6 +648,19 @@ const loadSavedAddresses = useCallback(async () => {
               </div>
             </div>
           </div>
+          {toast.show && (
+          <div className={`toast toast-${toast.type}`}>
+            <div className="toast-content">
+              <span>{toast.message}</span>
+              <button 
+                className="toast-close"
+                onClick={() => setToast({ show: false, message: '', type: '' })}
+              >
+                <FaTimes />
+              </button>
+            </div>
+          </div>
+        )}
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ import locationService from '../services/locationService';
 import orderService from '../services/orderService'; 
 import StatisticsDashboard from './Statistics'; 
 function SofraniPaylas() {
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [editingPackage, setEditingPackage] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [siparisler, setSiparisler] = useState([]);
@@ -56,6 +57,10 @@ function SofraniPaylas() {
     imageFile: null,
     images: []
   });
+  const showToast = (message, type = 'success') => {
+  setToast({ show: true, message, type });
+  setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+};
   // Google Maps API yükleme fonksiyonu
   const loadGoogleMapsAPI = useCallback(() => {
     return new Promise((resolve, reject) => {
@@ -231,7 +236,7 @@ function SofraniPaylas() {
           markerRef.current.setPosition(location);
         }
       } else {
-        alert('Adres bulunamadı!');
+        showToast('Adres bulunamadı!', 'error');
       }
     });
   };
@@ -334,7 +339,7 @@ const handleSubmit = async (e) => {
       const response = await packageService.updatePackage(editingPackage.package_id, updateData);
       console.log("✅ Güncellenen paket:", response.data);
       
-      alert("Paket başarıyla güncellendi!");
+      showToast("Paket başarıyla güncellendi!", "success");
     } else {
       // ➕ YENİ PAKET OLUŞTURMA İŞLEMİ
       const packageData = new FormData();
@@ -383,14 +388,14 @@ const handleSubmit = async (e) => {
       const response = await packageService.createPackage(packageData);
       console.log("✅ Oluşturulan paket:", response.data);
       
-      alert("Paket başarıyla oluşturuldu!");
+      showToast("Paket başarıyla oluşturuldu!", "success");
     }
     resetForm();
     setActiveTab('aktifpaketler');
     
   } catch (err) {
     console.error("🚨 Hata:", err);
-    alert(err.message || 'Bir hata oluştu.');
+     showToast(err.message || 'Bir hata oluştu.', 'error');
   } finally {
     setLoading(false);
   }
@@ -414,7 +419,7 @@ const handleSubmit = async (e) => {
           )
         );
         
-        alert("Paket başarıyla iptal edildi.");
+        showToast("Paket başarıyla iptal edildi!", "success");
       } catch (err) {
       } finally {
         setLoading(false);
@@ -456,7 +461,7 @@ const refreshOrders = async () => {
 };
 const handleVerifyCode = async (orderId) => {
   if (!verificationCode.trim()) {
-    alert('Lütfen doğrulama kodunu girin.');
+    showToast('Lütfen doğrulama kodunu girin.', 'error');
     return;
   }
   
@@ -472,21 +477,21 @@ const handleVerifyCode = async (orderId) => {
           : order
       ));
       
-      alert('Teslimat başarıyla doğrulandı!');
+      showToast('Teslimat başarıyla doğrulandı!', 'success');
       setVerificationCode('');
       setShowOrderDetail(false);
       setSelectedOrder(null);
       
     } else {
-      alert('Geçersiz doğrulama kodu!');
+      showToast('Geçersiz doğrulama kodu!', 'error');
     }
     
   } catch (err) {
     console.error('Kod doğrulama hatası:', err);
     if (err.response?.status === 400) {
-      alert('Geçersiz doğrulama kodu!');
+      showToast('Geçersiz doğrulama kodu!', 'error');
     } else {
-      alert('Doğrulama sırasında bir hata oluştu.');
+      showToast('Doğrulama sırasında bir hata oluştu.', 'error');
     }
   } finally {
     setLoading(false);
@@ -504,11 +509,11 @@ const handleMarkReady = async (orderId) => {
           : order
       ));
       
-      alert('Sipariş hazır olarak işaretlendi!');
+      showToast('Sipariş hazır olarak işaretlendi!', 'success');
       
     } catch (err) {
       console.error('Sipariş güncelleme hatası:', err);
-      alert('Sipariş güncellenirken bir hata oluştu.');
+      showToast('Sipariş güncellenirken bir hata oluştu.', 'error');
     } finally {
       setLoading(false);
     }
@@ -1492,6 +1497,11 @@ const getImageUrlAlternative = (paket) => {
            )}
         </div>
       </div>
+      {toast.show && (
+      <div className={`toast toast-${toast.type}`}>
+        <div className="toast-content">{toast.message}</div>
+      </div>
+    )}
     </div>
   </div>
   );

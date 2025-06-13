@@ -21,6 +21,7 @@ const BusinessProfile = ({
     comment: '',
     photos: []
   });
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [businessStats, setBusinessStats] = useState({
     totalPackages: 0,
@@ -142,7 +143,12 @@ const BusinessProfile = ({
       console.error('Yorumlar yüklenirken hata:', error);
     }
   };
-
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: '' });
+    }, 3000);
+  };
   const loadActivePackages = async () => {
     // API çağrısı yapılacak - bu işletmenin aktif paketleri
     try {
@@ -185,7 +191,7 @@ const BusinessProfile = ({
 
   const handleSubmitReview = async () => {
     if (!newReview.comment.trim()) {
-      alert('Lütfen yorum yazın');
+      showToast('Lütfen yorum yazın', 'error');
       return;
     }
 
@@ -213,10 +219,10 @@ const BusinessProfile = ({
       
       setReviews(prev => [mockNewReview, ...prev]);
       setNewReview({ rating: 5, comment: '', photos: [] });
-      alert('Yorumunuz başarıyla gönderildi!');
+      showToast('Yorumunuz başarıyla gönderildi!', 'success');
     } catch (error) {
       console.error('Yorum gönderilirken hata:', error);
-      alert('Yorum gönderilirken bir hata oluştu');
+      showToast('Yorum gönderilirken bir hata oluştu', 'error');
     } finally {
       setIsSubmittingReview(false);
     }
@@ -517,7 +523,21 @@ const BusinessProfile = ({
             </div>
           )}
         </div>
+        {toast.show && (
+        <div className={`toast toast-${toast.type}`}>
+          <div className="toast-content">
+            <span>{toast.message}</span>
+            <button 
+              className="toast-close"
+              onClick={() => setToast({ show: false, message: '', type: '' })}
+            >
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+      )}
       </div>
+      
     </div>
   );
 };

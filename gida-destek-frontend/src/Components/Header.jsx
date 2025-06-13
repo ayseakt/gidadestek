@@ -267,11 +267,25 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
     }
   };
 
-  const toggleDonorMode = () => {
-    const newMode = !isDonorMode;
-    setIsDonorMode(newMode);
-    localStorage.setItem('donorMode', String(newMode));
-    
+const toggleDonorMode = () => {
+  const newMode = !isDonorMode;
+  
+  console.log('Mod değiştiriliyor:', isDonorMode, '->', newMode);
+  
+  // State'leri güncelle
+  setIsDonorMode(newMode);
+  localStorage.setItem('donorMode', String(newMode));
+  
+  // Menüleri kapat
+  setIsProfileMenuOpen(false);
+  setCartMenuOpen(false);
+  setNotificationMenuOpen(false);
+  
+  // Profil bilgilerini hemen güncelle
+  updateProfileForMode(newMode);
+  
+  // Navigate işlemini geciktir
+  setTimeout(() => {
     if (newMode) {
       if (isAuthenticated) {
         navigate('/sofrani-paylas');
@@ -286,7 +300,63 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
     } else {
       navigate('/');
     }
-  };
+  }, 100);
+};
+const updateProfileForMode = async (donorMode) => {
+  if (!isAuthenticated) return;
+  
+  try {
+    let profileData;
+    
+    if (donorMode) {
+      // Seller profili al
+      const sellerResult = await getSellerProfile();
+      
+      if (sellerResult && sellerResult.success) {
+        profileData = {
+          name: sellerResult.data?.business_name || 'İşletme Adı Belirtilmemiş',
+          profileImage: sellerResult.data?.profileImage || null,
+          type: 'seller',
+          ...sellerResult.data
+        };
+      } else {
+        // Fallback - normal user profili
+        const user = authService.getUser();
+        profileData = {
+          name: user?.name || 'İşletme Sahibi',
+          profileImage: user?.profileImage || null,
+          type: 'seller'
+        };
+      }
+    } else {
+      // User profili al
+      const userResult = await getUserProfile();
+      
+      if (userResult && userResult.success) {
+        profileData = {
+          name: userResult.data?.name || 'Kullanıcı',
+          profileImage: userResult.data?.profileImage || null,
+          type: 'user',
+          ...userResult.data
+        };
+      } else {
+        // Fallback
+        const user = authService.getUser();
+        profileData = {
+          name: user?.name || 'Kullanıcı',
+          profileImage: user?.profileImage || null,
+          type: 'user'
+        };
+      }
+    }
+    
+    setUserProfile(profileData);
+    console.log('Profil güncellendi:', profileData);
+    
+  } catch (error) {
+    console.error('Profil güncellenirken hata:', error);
+  }
+};
 
   const handleNotificationsClick = () => {
     setNotificationMenuOpen(!notificationMenuOpen);
@@ -298,15 +368,41 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
     if (notificationMenuOpen) setNotificationMenuOpen(false);
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    
-    if (onLogout) {
-      onLogout();
-    }
-    
-    navigate('/');
-  };
+const handleLogout = () => {
+  // Önce state'leri temizle
+  setIsAuthenticated(false);
+  setUserProfile({
+    name: 'Misafir',
+    profileImage: null,
+    type: 'guest'
+  });
+  setIsProfileMenuOpen(false);
+  setCartMenuOpen(false);
+  setNotificationMenuOpen(false);
+  setIsDonorMode(false);
+  
+  // Sepeti temizle
+  clearCart();
+  
+  // AuthService'den çıkış yap
+  authService.logout();
+  
+  // localStorage'ı temizle
+  localStorage.removeItem('donorMode');
+  
+  // Parent component'e bildir
+  if (onLogout) {
+    onLogout();
+  }
+  
+  // Ana sayfaya yönlendir
+  navigate('/');
+  
+  // Sayfayı yenile (eğer hala sorun varsa)
+  setTimeout(() => {
+    window.location.reload();
+  }, 100);
+};
 
   return (
     <>
@@ -414,34 +510,66 @@ function Header({ onLogout, onSearch }) { // onSearch prop'unu ekledik
                 <FaUser className="user-icon" />
               )}
             </div>
-
-            {isProfileMenuOpen && (
-              <div className="profile-menu">
-                <ul>
-                  {!isDonorMode ? (
-                    <>
-                      <li onClick={() => navigate('/profil')}>Profil</li>
-                      <li onClick={() => navigate('/aldiklarim')}>Siparişlerim</li>
-                      <li onClick={() => navigate('/degerlerim')}>Yorumlarım</li>
-                    </>
-                  ) : (
-                    <>
-                      <li onClick={() => navigate('/seller-profile')}>Profil</li>
-                      <li onClick={() => navigate('/paketlerim')}>Paketlerim</li>
-                      <li onClick={() => navigate('/sofrani-paylas')}>Kazançlarım</li>
-                      <li onClick={() => navigate('/degerlendirmeler')}>Yorumlarım</li>
-                      
-                    </>
-                  )}
-                  <button
-                    onClick={handleLogout}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
-                  >
-                    Çıkış Yap
-                  </button>
-                </ul>
-              </div>
-            )}
+{isProfileMenuOpen && (
+  <div className="profile-menu">
+    <div className="profile-menu-header">
+      <div className="profile-info">
+        {userProfile.profileImage ? (
+          <img src={userProfile.profileImage} alt="Profil" className="menu-profile-image" />
+        ) : (
+          <FaUser className="menu-user-icon" />
+        )}
+        <div className="profile-details">
+          <span className="profile-name">{userProfile.name}</span>
+          <span className="profile-mode">
+            {isDonorMode ? '🍽️ İşletme Modu' : '🛒 Alışveriş Modu'}
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    <ul>
+      {!isDonorMode ? (
+        <>
+          <li onClick={() => { setIsProfileMenuOpen(false); navigate('/profil'); }}>
+            <FaUser /> Profil
+          </li>
+          <li onClick={() => { setIsProfileMenuOpen(false); navigate('/aldiklarim'); }}>
+            <FaShoppingBag /> Siparişlerim
+          </li>
+          <li onClick={() => { setIsProfileMenuOpen(false); navigate('/degerlerim'); }}>
+            ⭐ Yorumlarım
+          </li>
+        </>
+      ) : (
+        <>
+          <li onClick={() => { setIsProfileMenuOpen(false); navigate('/seller-profile'); }}>
+            🏪 İşletme Profili
+          </li>
+          <li onClick={() => { setIsProfileMenuOpen(false); navigate('/paketlerim'); }}>
+            📦 Paketlerim
+          </li>
+          <li onClick={() => { setIsProfileMenuOpen(false); navigate('/sofrani-paylas'); }}>
+            💰 Kazançlarım
+          </li>
+          <li onClick={() => { setIsProfileMenuOpen(false); navigate('/degerlendirmeler'); }}>
+            ⭐ Yorumlarım
+          </li>
+        </>
+      )}
+      
+      <li className="menu-divider"></li>
+      
+      <li onClick={() => { setIsProfileMenuOpen(false); toggleDonorMode(); }} className="mode-toggle">
+        {isDonorMode ? '🛒 Alışveriş Moduna Geç' : '🍽️ Sofranı Paylaş Modu'}
+      </li>
+      
+      <li onClick={handleLogout} className="logout-item">
+        🚪 Çıkış Yap
+      </li>
+    </ul>
+  </div>
+)}
           </div>
         </div>
       </div>
